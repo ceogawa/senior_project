@@ -16,6 +16,7 @@ Press 'p' to toggle deferred shading
 #include "Shape.h"
 #include "WindowManager.h"
 #include "GLTextureWriter.h"
+#include "initGeom.h"
 
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
@@ -47,8 +48,8 @@ public:
 	vec3 light_positions[32]{};
 	vec3 light_colors[NUM_LIGHTS]{};
 
-	// Shape to be used (from obj file)
-	shared_ptr<Shape> nef;
+	vector<shared_ptr<Shape>> bookshelf;
+	vector<shared_ptr<Shape>> sofa;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -197,12 +198,6 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gColorSpec, 0);
 
-		//glGenRenderbuffers(1, &depthBuf);
-		////set up depth necessary as rendering a mesh that needs depth test
-		//glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
-		//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
-
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, DrawBuffers);
@@ -230,8 +225,6 @@ public:
 		srand(0);
 		for (int i = 0; i < 32; ++i) {
 			vec3 lightPos = vec3(i, 2.0f, -2.0f);
-			//vec3 lightColor = vec3(0.0f, 0.3f, 0.8f);
-			//lights[i] = Light(lightPos, lightColor);
 			light_positions[i] = lightPos;
 			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -268,20 +261,9 @@ public:
 
 	void initGeom(const std::string& resourceDirectory)
 	{
-		//Nefertiti
-		vector<tinyobj::shape_t> TOshapesN;
-		vector<tinyobj::material_t> objMaterialsN;
-		string errStr;
-    	//load in the mesh and make the shape(s)
-		bool rc = tinyobj::LoadObj(TOshapesN, objMaterialsN, errStr, (resourceDirectory + "/Nefertiti-100K.obj").c_str());
-		if (!rc) {
-			cerr << errStr << endl;
-		} else {
-			nef = make_shared<Shape>();
-			nef->createShape(TOshapesN[0]);
-			nef->measure();
-			nef->init();
-		}
+
+		sofa = initMesh("/objs/sofa.obj", sofa);
+		bookshelf = initMesh("/objs/bookcase.obj");
 
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
@@ -289,7 +271,7 @@ public:
 
 	void cameraUpdate() {
       //camera movement - made continuous while keypressed
-      float speed = 0.2;
+      float speed = 0.1;
       if (MOVEL){
         g_eye -= speed*strafe;
         g_lookAt -= speed*strafe;
@@ -338,34 +320,28 @@ public:
 		mat4 P = SetProjectionMatrix(prog);
 		mat4 V = SetView(prog);
 
- 		//draw a circle of Nefs
-		float tx, tz, theta = 0;
-		mat4 transO = translate(glm::mat4(1.0f), vec3(-nef->min.x, -nef->min.y, -nef->min.z));
-		mat4 scaleUnit = scale(glm::mat4(1.0f), vec3(1.0/(nef->max.x-nef->min.x)));
-		for (int i = 0; i < 10; i++) {
-			tx = (4.f) * sin(theta);
-			tz = (4.f) * cos(theta);
-			mat4 trans;
-			mat4 r1, r2;
-			trans = translate(glm::mat4(1.0f), vec3(tx, 0.5f, tz));
-			r2 = rotate(glm::mat4(1.0f), 3.14f + theta, vec3(0, 1, 0));
-			r1 = rotate(glm::mat4(1.0f), -radians(90.0f), vec3(1, 0, 0));
-			SetModel(prog, trans*r2*r1*scaleUnit*transO);
-			//SetMaterial(i % 4);
+		// draw sofa
+		for (int i = 0; i < sofa.size(); i++) {
+			/*mat4 scaleUnit = scale(mat4(1.0f), vec3(1.0 / (sofa[i]->max.x - sofa[i]->min.x)));
+			mat4 trans = translate(glm::mat4(1.0f), vec3(i, 0.5f, -1.0f));*/
+			SetModel(prog, vec3(0, 0.5f, -1.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
 			SetMaterial(1);
-			nef->draw(prog);
-			theta += 6.28f / 10.f;
-		}
-
-		// TODO moving lights??
-		for (int m = 0; m < 32; ++m) {
-			light_positions[m].x += 0.5 * sin(frametime);
-			light_positions[m].y += 0.2 * sin(frametime);
-			light_positions[m].z += 0.1 * sin(frametime);
+			sofa[i]->draw(prog);
 		}
 		
 
-		if (DEFER && !FirstTime)
+		// unbind after geometry pass
+		prog->unbind();
+
+		// TODO moving lights??
+	/*	for (int m = 0; m < 32; ++m) {
+			light_positions[m].x += 0.5 * sin(frametime);
+			light_positions[m].y += 0.2 * sin(frametime);
+			light_positions[m].z += 0.1 * sin(frametime);
+		}*/
+		
+
+		if (!FirstTime)
 		{
 			// now draw the actual output 
 			// render to the screen LIGHTING PASS
@@ -396,57 +372,17 @@ public:
 
 			deferProg->unbind();
 
-
-
-
 		}
 		//code to write out the FBO (texture) just once -an example
-		if (DEFER && FirstTime) {
+		if (FirstTime) {
 				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
-
-				//// render the texture to the framebuffer
-				//glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-				//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-				//texProg->bind();
-				//glActiveTexture(GL_TEXTURE0);
-				//glBindTexture(GL_TEXTURE_2D, gPosition);
-				//glUniform1i(texProg->getUniform("texBuf"), 0);
-				//glUniform3f(texProg->getUniform("Ldir"), g_light.x, g_light.y, g_light.z);
-				//glEnableVertexAttribArray(0);
-				//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-				//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-				//glDrawArrays(GL_TRIANGLES, 0, 6);
-				//glDisableVertexAttribArray(0);
-				//texProg->unbind();
-			
-
 				FirstTime = false;
 		}
 	}
 	
-
-	// To complete image processing on the specificed texture
-	// Right now just draws large quad to the screen that is texture mapped
-	// with the prior scene image - next lab we will process
-	void DrawQuad(GLuint inTex) {
-
-		// example applying of 'drawing' the FBO texture - change shaders
-		texProg->bind();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, inTex);
-		glUniform1i(texProg->getUniform("texBuf"), 0);
-		glUniform3f(texProg->getUniform("Ldir"), 1, -1, 0);
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		glDisableVertexAttribArray(0);
-		texProg->unbind();
-	}
 
 	/* helper functions for sending matrix data to the GPU */
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
@@ -457,9 +393,18 @@ public:
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
 	}
- 	/* model transforms - normal */
-	void SetModel(shared_ptr<Program> curS, mat4 m) {
-		glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(m));
+ //	/* model transforms - normal */
+	//void SetModel(shared_ptr<Program> curS, mat4 m) {
+	//	glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(m));
+	//}
+
+	void SetModel(shared_ptr<Program> curS, vec3 trans, float rotY, float rotX, float sx, float sy, float sz) {
+		mat4 Trans = glm::translate(glm::mat4(1.0f), trans);
+		mat4 RotX = glm::rotate(glm::mat4(1.0f), rotX, vec3(1, 0, 0));
+		mat4 RotY = glm::rotate(glm::mat4(1.0f), rotY, vec3(0, 1, 0));
+		mat4 ScaleS = glm::scale(glm::mat4(1.0f), vec3(sx, sy, sz));
+		mat4 ctm = Trans * RotX * RotY * ScaleS;
+		glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(ctm));
 	}
 
 	/*normal game camera */
@@ -548,9 +493,9 @@ public:
 		if (key == GLFW_KEY_Z && action == GLFW_RELEASE) {
 			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
-		if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+		/*if (key == GLFW_KEY_P && action == GLFW_PRESS) {
 			DEFER = !DEFER;
-		}
+		}*/
 		if (action == GLFW_RELEASE){
 			MOVER = MOVEF = MOVEB = MOVEL = false;
 		}
