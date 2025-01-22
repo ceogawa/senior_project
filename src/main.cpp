@@ -4,9 +4,11 @@ Winter 2017, updated May 2020, May 2022- ZJW (Piddington texture write)
 Press 'p' to toggle deferred shading
 */
 
+
+
+#include <chrono>
 #include <iostream>
 #include <glad/glad.h>
-#include <chrono>
 
 #include "GLSL.h"
 #include "Program.h"
@@ -18,10 +20,17 @@ Press 'p' to toggle deferred shading
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#define NUM_LIGHTS 32
 
 using namespace std;
 using namespace glm;
 enum Mat {jade=0, brass, copper, grey, tone1, tone2, tone3, tone4, turquoise, shadow};
+
+struct Light {
+	vec3 Position;
+	vec3 Color;
+};
+
 
 
 class Application : public EventCallbacks
@@ -34,8 +43,9 @@ public:
 	// Our shader program
 	std::shared_ptr<Program> prog;
 	std::shared_ptr<Program> texProg;
-
-
+	std::shared_ptr<Program> deferProg;
+	vec3 light_positions[32]{};
+	vec3 light_colors[NUM_LIGHTS]{};
 
 	// Shape to be used (from obj file)
 	shared_ptr<Shape> nef;
@@ -51,12 +61,18 @@ public:
 	GLuint quad_vertexbuffer;
 
 	//reference to texture FBO
-	GLuint gBuffer;
-	GLuint gPosition, gNormal, gColorSpec;
-	GLuint depthBuf;
+	//reference to texture FBO
+	GLuint gBuffer = 0;      // Initialize to 0 (or any value you prefer)
+	GLuint gPosition = 0;
+	GLuint gNormal = 0;
+	GLuint gColorSpec = 0;
+	GLuint depthBuf = 0;
+	GLuint lightPositions = 0;
+	GLuint lightColors = 0;
+
 
 	bool FirstTime = true;
-	bool DEFER = false;
+	bool DEFER = true;
 	int gMat = 0;
 
 	//camera control - you can ignore - what matters is eye location and view matrix
@@ -89,19 +105,27 @@ public:
 		prog->setVerbose(true);
 
 		prog->setShaderNames(
-			resourceDirectory + "/simple_vert.glsl",
-			resourceDirectory + "/gbuf_frag.glsl");
+			resourceDirectory + "/geometry_pass_vert.glsl",
+			resourceDirectory + "/geometry_pass_frag.glsl");
 		prog->init();
+		// uniforms for geometry pass
 		prog->addUniform("P");
 		prog->addUniform("V");
 		prog->addUniform("M");
 		prog->addUniform("MatAmb");
 		prog->addUniform("MatDif");
+		// attributes for geom pass
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
+		// vert shader passes
+		//		vec3 fragPos;
+		//		vec3 fragNor; 
+		// to the geometry frag shader
 		
-		//set up the shaders to blur the FBO just a placeholder pass thru now
+		//set up the shaders to blur the FBO just a PLACEHODLER pass thru now
 		//next lab modify and possibly add other shaders to complete blur
+
+		// TODO rewrite without texprog
 		texProg = make_shared<Program>();
 		texProg->setVerbose(true);
 		texProg->setShaderNames(
@@ -111,6 +135,28 @@ public:
 		texProg->addUniform("texBuf");
 		texProg->addAttribute("vertPos");
 		texProg->addUniform("Ldir");
+
+
+		// deferred shader init
+		deferProg = make_shared<Program>();
+		deferProg->setVerbose(true);
+		deferProg->setShaderNames(
+			resourceDirectory + "/deferred_vert.glsl",
+			resourceDirectory + "/deferred_frag.glsl"
+		);
+		deferProg->init();
+		// add gbuffer uniforms to frag shader
+		deferProg->addUniform("gPosition");
+		deferProg->addUniform("gNormal");
+		deferProg->addUniform("gColorSpec");
+		// add list of lights to frag shader
+		deferProg->addUniform("lightPos");
+		deferProg->addUniform("lightCol");
+		// cam
+		deferProg->addUniform("viewPos");
+		// vertPos for shader. converts position to texcoord
+		deferProg->addAttribute("vertPos");
+
 
 		initBuffers();
 
@@ -123,12 +169,13 @@ public:
 
 		//initialize the buffers -- from learnopengl.com
 		glGenFramebuffers(1, &gBuffer);
-		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer); 
+		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
 		// - position color buffer
+		// TODO rewrite with createFBO()
 		glGenTextures(1, &gPosition);
 		glBindTexture(GL_TEXTURE_2D, gPosition);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
@@ -136,12 +183,13 @@ public:
 		// - normal color buffer
 		glGenTextures(1, &gNormal);
 		glBindTexture(GL_TEXTURE_2D, gNormal);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
 
 		// - color + specular color buffer
+		// use alpha channel of texture to decide specular intensity
 		glGenTextures(1, &gColorSpec);
 		glBindTexture(GL_TEXTURE_2D, gColorSpec);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -149,16 +197,48 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gColorSpec, 0);
 
-		glGenRenderbuffers(1, &depthBuf);
-		//set up depth necessary as rendering a mesh that needs depth test
-		glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+		//glGenRenderbuffers(1, &depthBuf);
+		////set up depth necessary as rendering a mesh that needs depth test
+		//glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
+		//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
 
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, DrawBuffers);
 
+
+		glGenRenderbuffers(1, &depthBuf);
+		//set up depth necessary as rendering a mesh that needs depth test
+		glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+		// error check if framebuffer is complete
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+			std::cout << "Framebuffer not complete!" << std::endl;
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		initLights();
+
+
+	}
+
+
+	void initLights() {
+		//Light lights[32]{};
+		// TODO rewrite light to include light color
+		srand(0);
+		for (int i = 0; i < 32; ++i) {
+			vec3 lightPos = vec3(i, 2.0f, -2.0f);
+			//vec3 lightColor = vec3(0.0f, 0.3f, 0.8f);
+			//lights[i] = Light(lightPos, lightColor);
+			light_positions[i] = lightPos;
+			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+			light_colors[i] = vec3(r, g, b);
+			cout << "light colors: " << r << ", " << g << ", " << b << endl;
+		}
 	}
 
 	void createFBO(GLuint& fb, GLuint& tex) {
@@ -238,6 +318,7 @@ public:
 
 		if (DEFER)
 		{
+			// bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
 			glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 		}
 		else
@@ -270,38 +351,79 @@ public:
 			r2 = rotate(glm::mat4(1.0f), 3.14f + theta, vec3(0, 1, 0));
 			r1 = rotate(glm::mat4(1.0f), -radians(90.0f), vec3(1, 0, 0));
 			SetModel(prog, trans*r2*r1*scaleUnit*transO);
-			SetMaterial(i % 4);
+			//SetMaterial(i % 4);
+			SetMaterial(1);
 			nef->draw(prog);
 			theta += 6.28f / 10.f;
 		}
 
-		prog->unbind();
+		// TODO moving lights??
+		for (int m = 0; m < 32; ++m) {
+			light_positions[m].x += 0.5 * sin(frametime);
+			light_positions[m].y += 0.2 * sin(frametime);
+			light_positions[m].z += 0.1 * sin(frametime);
+		}
+		
 
-		if (DEFER & !FirstTime)
+		if (DEFER && !FirstTime)
 		{
 			// now draw the actual output 
+			// render to the screen LIGHTING PASS
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			texProg->bind();
-				glActiveTexture(GL_TEXTURE0);
-				glBindTexture(GL_TEXTURE_2D, gPosition);
-				glUniform1i(texProg->getUniform("texBuf"), 0);
-				glUniform3f(texProg->getUniform("Ldir"), g_light.x, g_light.y, g_light.z);
-				glEnableVertexAttribArray(0);
-				glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-				glDisableVertexAttribArray(0);
-			texProg->unbind();
+			deferProg->bind();
+			// bind textures for pos, normals, color
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, gPosition);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, gNormal);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, gColorSpec);
+
+			glUniform1i(deferProg->getUniform("gPosition"), 0);
+			glUniform1i(deferProg->getUniform("gNormal"), 1);
+			glUniform1i(deferProg->getUniform("gColorSpec"), 2);
+			glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
+			glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
+			glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
+
+			glEnableVertexAttribArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			glDisableVertexAttribArray(0);
+
+			deferProg->unbind();
+
+
+
 
 		}
 		//code to write out the FBO (texture) just once -an example
-		if (DEFER & FirstTime) {
+		if (DEFER && FirstTime) {
 				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+
+				//// render the texture to the framebuffer
+				//glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+				//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				//texProg->bind();
+				//glActiveTexture(GL_TEXTURE0);
+				//glBindTexture(GL_TEXTURE_2D, gPosition);
+				//glUniform1i(texProg->getUniform("texBuf"), 0);
+				//glUniform3f(texProg->getUniform("Ldir"), g_light.x, g_light.y, g_light.z);
+				//glEnableVertexAttribArray(0);
+				//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+				//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				//glDrawArrays(GL_TRIANGLES, 0, 6);
+				//glDisableVertexAttribArray(0);
+				//texProg->unbind();
+			
+
 				FirstTime = false;
 		}
 	}
@@ -375,6 +497,12 @@ public:
 		glGenBuffers(1, &quad_vertexbuffer);
 		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
 		glBufferData(GL_ARRAY_BUFFER, sizeof(g_quad_vertex_buffer_data), g_quad_vertex_buffer_data, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+		// Unbind VAO
+		glBindVertexArray(0);
 	}
 
 	/* much of the camera is here */
@@ -475,10 +603,11 @@ int main(int argc, char *argv[])
 	// This is the code that will likely change program to program as you
 	// may need to initialize or set up different data and state
 
+	// setup shaders, setup gbuffer, create and attach depth buffer
 	application->initGL(resourceDir);
 	application->initGeom(resourceDir);
 
-	auto lastTime = chrono::high_resolution_clock::now();
+	auto lastTime = std::chrono::high_resolution_clock::now();
 	// Loop until the user closes the window.
 	while (! glfwWindowShouldClose(windowManager->getHandle()))
 	{

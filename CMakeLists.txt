@@ -46,6 +46,6 @@ if(NOT WIN32)
 else()
 
   # Link OpenGL on Windows
-  target_link_libraries(${CMAKE_PROJECT_NAME} opengl32.lib)
+  target_link_libraries(${CMAKE_PROJECT_NAME} opengl32)
 
 endif()

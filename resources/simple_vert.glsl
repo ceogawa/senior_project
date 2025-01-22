@@ -7,10 +7,12 @@ uniform mat4 M;
 
 out vec3 fragNor;
 out vec3 fragPos;
+//out vec2 texCoord;
 
 void main()
 {
 	gl_Position = P * V *M* vertPos;
+	//texCoord = (vertPos.xy+vec2(1, 1))/2.0;
 	fragNor = (V* M * vec4(vertNor, 0.0)).xyz;
 	fragPos = vec3(V* M*vertPos);
 }

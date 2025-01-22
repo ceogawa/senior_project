@@ -1,24 +1,40 @@
 #version 330 core
-layout (location = 0) out vec3 gPosition;
-layout (location = 1) out vec3 gNormal;
-layout (location = 2) out vec4 gAlbedoSpec;
+out vec4 FragColor;
+in vec2 texCoord;
 
-in vec3 fragPos;
-in vec3 fragNor;
+uniform sampler2D gPosition;
+uniform sampler2D gNormal;
+uniform sampler2D gColorSpec;
 
-uniform vec3 MatAmb;
-uniform vec3 MatDif;
+struct Light{
+    vec3 Position;
+    vec3 Color;
+};
+
+const int NR_LIGHTS = 32;
+uniform vec3 lightPos[NR_LIGHTS];
+//uniform Light lights[NR_LIGHTS];
+uniform vec3 viewPos;
+
 
 void main()
 {
+    vec3 FragPos = texture(gPosition, texCoord).rgb;
+    vec3 Normal = texture(gNormal, texCoord).rgb;
+    vec3 Albedo = texture(gColorSpec, texCoord).rgb;
+    float Spec = texture(gColorSpec, texCoord).a;
 
-    // store the fragment position vector in the first gbuffer texture
-    gPosition = fragPos;
-    // also store the per-fragment normals into the gbuffer
-    gNormal = normalize(fragNor);
-    // and the diffuse per-fragment color
-    gAlbedoSpec.rgb = MatDif;
-    // store specular intensity in gAlbedoSpec's alpha component
-	 //constant could be from a texture
-    gAlbedoSpec.a = 0.5;
+    vec3 lighting = Albedo * 0.1;
+    vec3 viewDir = normalize(viewPos - FragPos);
+    for (int i = 0; i < NR_LIGHTS; ++i){
+        vec3 lightDir = normalize(lightPos[i] - FragPos);
+        //vec3 lightDir = normalize(lights[i].Position - FragPos);
+        vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Albedo * vec3(0.0f, 0.3f, 0.8f);
+        //vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Albedo * lights[i].Color;
+        lighting += diffuse;
+    }
+
+     FragColor = vec4(lighting, 1.0);
 } 
+
+
