@@ -4,6 +4,8 @@ Winter 2017, updated May 2020, May 2022- ZJW (Piddington texture write)
 Press 'p' to toggle deferred shading
 */
 
+// learnopengl for deferred assistance
+
 
 
 #include <chrono>
@@ -50,6 +52,7 @@ public:
 
 	vector<shared_ptr<Shape>> bookshelf;
 	vector<shared_ptr<Shape>> sofa;
+	vector<shared_ptr<Shape>> coffeetable;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -135,7 +138,7 @@ public:
 		texProg->init();
 		texProg->addUniform("texBuf");
 		texProg->addAttribute("vertPos");
-		texProg->addUniform("Ldir");
+		//texProg->addUniform("Ldir");
 
 
 		// deferred shader init
@@ -163,40 +166,32 @@ public:
 
 
 	}
+
+	void createBuffer(GLuint *buffer, int width, int height, GLenum attachment) {
+		glGenTextures(1, buffer);
+		glBindTexture(GL_TEXTURE_2D, *buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, 0);
+
+	}
 	
-	void initBuffers() {
+	void initBuffers( ) {
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 
-		//initialize the buffers -- from learnopengl.com
 		glGenFramebuffers(1, &gBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
 		// - position color buffer
 		// TODO rewrite with createFBO()
-		glGenTextures(1, &gPosition);
-		glBindTexture(GL_TEXTURE_2D, gPosition);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
-
+		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0);
 		// - normal color buffer
-		glGenTextures(1, &gNormal);
-		glBindTexture(GL_TEXTURE_2D, gNormal);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
-
+		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		glGenTextures(1, &gColorSpec);
-		glBindTexture(GL_TEXTURE_2D, gColorSpec);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gColorSpec, 0);
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2);
 
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
@@ -224,7 +219,10 @@ public:
 		// TODO rewrite light to include light color
 		srand(0);
 		for (int i = 0; i < 32; ++i) {
-			vec3 lightPos = vec3(i, 2.0f, -2.0f);
+			//vec3 lightPos = vec3(i, 8.0f, -2.0f);
+			float max_number = 13.0f;
+			float minimum_number = -10.0f; 
+			vec3 lightPos = vec3(rand() % 12, 40.0f, rand() % 12);
 			light_positions[i] = lightPos;
 			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
@@ -263,7 +261,8 @@ public:
 	{
 
 		sofa = initMesh("/objs/sofa.obj", sofa);
-		bookshelf = initMesh("/objs/bookcase.obj");
+		bookshelf = initMesh("/objs/bookcase.obj", bookshelf);
+		coffeetable = initMesh("/objs/coffee_table.obj", coffeetable);
 
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
@@ -271,7 +270,7 @@ public:
 
 	void cameraUpdate() {
       //camera movement - made continuous while keypressed
-      float speed = 0.1;
+      float speed = 0.09;
       if (MOVEL){
         g_eye -= speed*strafe;
         g_lookAt -= speed*strafe;
@@ -287,6 +286,11 @@ public:
       }
     }
 	
+
+	/*void geometry_pass() {
+
+
+	}*/
 
 
 	void render(float frametime) {
@@ -328,7 +332,18 @@ public:
 			SetMaterial(1);
 			sofa[i]->draw(prog);
 		}
-		
+
+		for (int i = 1; i < bookshelf.size(); i++) {
+			SetModel(prog, vec3(2.0f, 0.5f, 0.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			SetMaterial(0);
+			bookshelf[i]->draw(prog);
+		}
+
+		for (int i = 0; i < coffeetable.size(); i++) {
+			SetModel(prog, vec3(-4.0f, 0.5f, -0.5f), 0.0f, 0.0f, 2.0f, 2.0f, 2.0f);
+			SetMaterial(2);
+			coffeetable[i]->draw(prog);
+		}
 
 		// unbind after geometry pass
 		prog->unbind();
@@ -383,6 +398,22 @@ public:
 		}
 	}
 	
+	void DrawQuad(GLuint inTex) {
+
+		// example applying of 'drawing' the FBO texture - change shaders
+		texProg->bind();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, inTex);
+		glUniform1i(texProg->getUniform("texBuf"), 0);
+		glUniform3f(texProg->getUniform("Ldir"), 1, -1, 0);
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDisableVertexAttribArray(0);
+		texProg->unbind();
+	}
+
 
 	/* helper functions for sending matrix data to the GPU */
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
@@ -437,6 +468,16 @@ public:
 			-1.0f,  1.0f, 0.0f,
 			1.0f, -1.0f, 0.0f,
 			1.0f,  1.0f, 0.0f,
+		};
+
+		static const GLfloat left_wall_data[] =
+		{  
+			0.0f, 1.0f, -1.0f,
+			0.0f, -1.0f, 1.0f,
+			0.0f, 1.0f, 1.0f,
+			0.0f, 1.0f, 1.0f,
+			0.0f, -1.0f, 1.0f,
+			0.0f, 1.0f, -1.0f,
 		};
 
 		glGenBuffers(1, &quad_vertexbuffer);

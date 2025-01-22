@@ -1,7 +1,8 @@
 {
   "ExpandedNodes": [
     "",
-    "\\build"
+    "\\build",
+    "\\src"
   ],
   "SelectedNode": "\\build\\defer.sln",
   "PreviewInSolutionExplorer": false

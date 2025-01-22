@@ -4,7 +4,6 @@ in vec2 texCoord;
 out vec4 color;
 uniform sampler2D texBuf;
 //ignored for now
-uniform vec3 Ldir;
 
 /* just pass through the texture color we will add to this next lab */
 void main(){
