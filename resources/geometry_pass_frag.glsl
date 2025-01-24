@@ -20,5 +20,5 @@ void main()
     // and the diffuse per-fragment color
     gAlbedoSpec.rgb = MatDif;
     // store specular intensity in gAlbedoSpec's alpha component
-    gAlbedoSpec.a = 0.4;
+    gAlbedoSpec.a = 0.1;
 } 

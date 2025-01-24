@@ -4,6 +4,8 @@ Winter 2017, updated May 2020, May 2022- ZJW (Piddington texture write)
 Press 'p' to toggle deferred shading
 */
 
+// learnopengl for deferred assistance
+
 
 
 #include <chrono>
@@ -16,11 +18,12 @@ Press 'p' to toggle deferred shading
 #include "Shape.h"
 #include "WindowManager.h"
 #include "GLTextureWriter.h"
+#include "initGeom.h"
 
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#define NUM_LIGHTS 32
+#define NUM_LIGHTS 16
 
 using namespace std;
 using namespace glm;
@@ -44,11 +47,14 @@ public:
 	std::shared_ptr<Program> prog;
 	std::shared_ptr<Program> texProg;
 	std::shared_ptr<Program> deferProg;
-	vec3 light_positions[32]{};
+	vec3 light_positions[NUM_LIGHTS]{};
 	vec3 light_colors[NUM_LIGHTS]{};
 
-	// Shape to be used (from obj file)
-	shared_ptr<Shape> nef;
+	vector<shared_ptr<Shape>> bookshelf;
+	vector<shared_ptr<Shape>> sofa;
+	vector<shared_ptr<Shape>> coffeetable;
+	vector<shared_ptr<Shape>> lamp;
+	shared_ptr<Shape> wall;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -122,10 +128,8 @@ public:
 		//		vec3 fragNor; 
 		// to the geometry frag shader
 		
-		//set up the shaders to blur the FBO just a PLACEHODLER pass thru now
-		//next lab modify and possibly add other shaders to complete blur
 
-		// TODO rewrite without texprog
+		// TODO texprog? modify to pass color to defer
 		texProg = make_shared<Program>();
 		texProg->setVerbose(true);
 		texProg->setShaderNames(
@@ -134,7 +138,7 @@ public:
 		texProg->init();
 		texProg->addUniform("texBuf");
 		texProg->addAttribute("vertPos");
-		texProg->addUniform("Ldir");
+		//texProg->addUniform("Ldir");
 
 
 		// deferred shader init
@@ -162,46 +166,32 @@ public:
 
 
 	}
+
+	void createBuffer(GLuint *buffer, int width, int height, GLenum attachment) {
+		glGenTextures(1, buffer);
+		glBindTexture(GL_TEXTURE_2D, *buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, 0);
+
+	}
 	
-	void initBuffers() {
+	void initBuffers( ) {
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 
-		//initialize the buffers -- from learnopengl.com
 		glGenFramebuffers(1, &gBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
 		// - position color buffer
 		// TODO rewrite with createFBO()
-		glGenTextures(1, &gPosition);
-		glBindTexture(GL_TEXTURE_2D, gPosition);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
-
+		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0);
 		// - normal color buffer
-		glGenTextures(1, &gNormal);
-		glBindTexture(GL_TEXTURE_2D, gNormal);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
-
+		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		glGenTextures(1, &gColorSpec);
-		glBindTexture(GL_TEXTURE_2D, gColorSpec);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gColorSpec, 0);
-
-		//glGenRenderbuffers(1, &depthBuf);
-		////set up depth necessary as rendering a mesh that needs depth test
-		//glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
-		//glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2);
 
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
@@ -226,17 +216,25 @@ public:
 
 	void initLights() {
 		//Light lights[32]{};
-		// TODO rewrite light to include light color
+		// TODO determine color in artistic way
 		srand(0);
-		for (int i = 0; i < 32; ++i) {
-			vec3 lightPos = vec3(i, 2.0f, -2.0f);
-			//vec3 lightColor = vec3(0.0f, 0.3f, 0.8f);
-			//lights[i] = Light(lightPos, lightColor);
+		for (int i = 0; i < NUM_LIGHTS; ++i) {
+			//vec3 lightPos = vec3(i, 8.0f, -2.0f);
+			float max_number = 13.0f;
+			float minimum_number = -10.0f; 
+			vec3 lightPos;
+			if (i % 2 == 0) {
+				lightPos = vec3(rand() % 5, 5.0f, -3.0f);
+			}
+			else {
+				lightPos = vec3(rand() % 5, 0.0f, (rand() % 10));
+			}
 			light_positions[i] = lightPos;
 			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-			light_colors[i] = vec3(r, g, b);
+			//light_colors[i] = vec3(r, g, b);
+			light_colors[i] = vec3(0.7f);
 			cout << "light colors: " << r << ", " << g << ", " << b << endl;
 		}
 	}
@@ -268,20 +266,12 @@ public:
 
 	void initGeom(const std::string& resourceDirectory)
 	{
-		//Nefertiti
-		vector<tinyobj::shape_t> TOshapesN;
-		vector<tinyobj::material_t> objMaterialsN;
-		string errStr;
-    	//load in the mesh and make the shape(s)
-		bool rc = tinyobj::LoadObj(TOshapesN, objMaterialsN, errStr, (resourceDirectory + "/Nefertiti-100K.obj").c_str());
-		if (!rc) {
-			cerr << errStr << endl;
-		} else {
-			nef = make_shared<Shape>();
-			nef->createShape(TOshapesN[0]);
-			nef->measure();
-			nef->init();
-		}
+
+		sofa = initMultiMesh("/objs/sofa.obj", sofa);
+		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
+		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
+		wall = initMesh("/objs/wall.obj", wall);
+		lamp = initMultiMesh("/objs/desk_lamp.obj", lamp);
 
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
@@ -289,7 +279,7 @@ public:
 
 	void cameraUpdate() {
       //camera movement - made continuous while keypressed
-      float speed = 0.2;
+      float speed = 0.1;
       if (MOVEL){
         g_eye -= speed*strafe;
         g_lookAt -= speed*strafe;
@@ -305,6 +295,66 @@ public:
       }
     }
 	
+
+	void drawGeometry() {
+		prog->bind();
+
+		// Create projection and view matricies
+		mat4 P = SetProjectionMatrix(prog);
+		mat4 V = SetView(prog);
+
+		// set model sets up Model matrix
+
+		// SOFA
+		for (int i = 0; i < sofa.size(); i++) {
+			/*mat4 scaleUnit = scale(mat4(1.0f), vec3(1.0 / (sofa[i]->max.x - sofa[i]->min.x)));
+			mat4 trans = translate(glm::mat4(1.0f), vec3(i, 0.5f, -1.0f));*/
+			SetModel(prog, vec3(0, 0.3f, -1.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			SetMaterial(0);
+			sofa[i]->draw(prog);
+		}
+
+		// COFFEE TABLE
+		for (int i = 0; i < coffeetable.size(); i++) {
+			SetModel(prog, vec3(1.0f, 0.3f, 0.9f), 0.0f, 0.0f, 0.012f, 0.009f, 0.011f);
+			SetMaterial(2);
+			coffeetable[i]->draw(prog);
+		}
+
+		// LAMP
+		for (int i = 0; i < lamp.size(); i++) {
+			SetModel(prog, vec3(1.4f, 0.7f, 0.9f), 3.14f , 0.0f, 2.0f, 2.0f, 2.0f);
+			SetMaterial(3);
+			lamp[i]->draw(prog);
+		}
+
+		//left wall
+		SetModel(prog, vec3(-4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		//right wall
+		SetModel(prog, vec3(4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		//back wall
+		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 0.0f, 1.5f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		// floor
+		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		// ceiling??
+
+
+		// unbind after geometry pass
+		prog->unbind();
+
+	}
 
 
 	void render(float frametime) {
@@ -331,41 +381,19 @@ public:
  
 		float aspect = width/(float)height;
 
-		//Draw our scene - meshes - right now to a texture
-		prog->bind();
+		// set up model, view, projection matrices
+		drawGeometry();
 
-		// Create the matrices
-		mat4 P = SetProjectionMatrix(prog);
-		mat4 V = SetView(prog);
-
- 		//draw a circle of Nefs
-		float tx, tz, theta = 0;
-		mat4 transO = translate(glm::mat4(1.0f), vec3(-nef->min.x, -nef->min.y, -nef->min.z));
-		mat4 scaleUnit = scale(glm::mat4(1.0f), vec3(1.0/(nef->max.x-nef->min.x)));
-		for (int i = 0; i < 10; i++) {
-			tx = (4.f) * sin(theta);
-			tz = (4.f) * cos(theta);
-			mat4 trans;
-			mat4 r1, r2;
-			trans = translate(glm::mat4(1.0f), vec3(tx, 0.5f, tz));
-			r2 = rotate(glm::mat4(1.0f), 3.14f + theta, vec3(0, 1, 0));
-			r1 = rotate(glm::mat4(1.0f), -radians(90.0f), vec3(1, 0, 0));
-			SetModel(prog, trans*r2*r1*scaleUnit*transO);
-			//SetMaterial(i % 4);
-			SetMaterial(1);
-			nef->draw(prog);
-			theta += 6.28f / 10.f;
-		}
-
+		
 		// TODO moving lights??
-		for (int m = 0; m < 32; ++m) {
+		/*	for (int m = 0; m < 32; ++m) {
 			light_positions[m].x += 0.5 * sin(frametime);
 			light_positions[m].y += 0.2 * sin(frametime);
 			light_positions[m].z += 0.1 * sin(frametime);
-		}
+		}*/
 		
 
-		if (DEFER && !FirstTime)
+		if (!FirstTime)
 		{
 			// now draw the actual output 
 			// render to the screen LIGHTING PASS
@@ -384,6 +412,7 @@ public:
 			glUniform1i(deferProg->getUniform("gPosition"), 0);
 			glUniform1i(deferProg->getUniform("gNormal"), 1);
 			glUniform1i(deferProg->getUniform("gColorSpec"), 2);
+
 			glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
 			glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
 			glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
@@ -396,42 +425,17 @@ public:
 
 			deferProg->unbind();
 
-
-
-
 		}
 		//code to write out the FBO (texture) just once -an example
-		if (DEFER && FirstTime) {
+		if (FirstTime) {
 				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
-
-				//// render the texture to the framebuffer
-				//glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-				//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-				//texProg->bind();
-				//glActiveTexture(GL_TEXTURE0);
-				//glBindTexture(GL_TEXTURE_2D, gPosition);
-				//glUniform1i(texProg->getUniform("texBuf"), 0);
-				//glUniform3f(texProg->getUniform("Ldir"), g_light.x, g_light.y, g_light.z);
-				//glEnableVertexAttribArray(0);
-				//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-				//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-				//glDrawArrays(GL_TRIANGLES, 0, 6);
-				//glDisableVertexAttribArray(0);
-				//texProg->unbind();
-			
-
 				FirstTime = false;
 		}
 	}
 	
-
-	// To complete image processing on the specificed texture
-	// Right now just draws large quad to the screen that is texture mapped
-	// with the prior scene image - next lab we will process
 	void DrawQuad(GLuint inTex) {
 
 		// example applying of 'drawing' the FBO texture - change shaders
@@ -442,7 +446,7 @@ public:
 		glUniform3f(texProg->getUniform("Ldir"), 1, -1, 0);
 		glEnableVertexAttribArray(0);
 		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glDisableVertexAttribArray(0);
 		texProg->unbind();
@@ -457,9 +461,14 @@ public:
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
 	}
- 	/* model transforms - normal */
-	void SetModel(shared_ptr<Program> curS, mat4 m) {
-		glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(m));
+
+	void SetModel(shared_ptr<Program> curS, vec3 trans, float rotY, float rotX, float sx, float sy, float sz) {
+		mat4 Trans = glm::translate(glm::mat4(1.0f), trans);
+		mat4 RotX = glm::rotate(glm::mat4(1.0f), rotX, vec3(1, 0, 0));
+		mat4 RotY = glm::rotate(glm::mat4(1.0f), rotY, vec3(0, 1, 0));
+		mat4 ScaleS = glm::scale(glm::mat4(1.0f), vec3(sx, sy, sz));
+		mat4 ctm = Trans * RotX * RotY * ScaleS;
+		glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(ctm));
 	}
 
 	/*normal game camera */
@@ -492,6 +501,16 @@ public:
 			-1.0f,  1.0f, 0.0f,
 			1.0f, -1.0f, 0.0f,
 			1.0f,  1.0f, 0.0f,
+		};
+
+		static const GLfloat left_wall_data[] =
+		{  
+			0.0f, 1.0f, -1.0f,
+			0.0f, -1.0f, 1.0f,
+			0.0f, 1.0f, 1.0f,
+			0.0f, 1.0f, 1.0f,
+			0.0f, -1.0f, 1.0f,
+			0.0f, 1.0f, -1.0f,
 		};
 
 		glGenBuffers(1, &quad_vertexbuffer);
@@ -548,9 +567,9 @@ public:
 		if (key == GLFW_KEY_Z && action == GLFW_RELEASE) {
 			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
-		if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+		/*if (key == GLFW_KEY_P && action == GLFW_PRESS) {
 			DEFER = !DEFER;
-		}
+		}*/
 		if (action == GLFW_RELEASE){
 			MOVER = MOVEF = MOVEB = MOVEL = false;
 		}
