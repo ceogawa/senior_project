@@ -15,13 +15,15 @@ using namespace std;
 using namespace glm;
 
 
-vector<shared_ptr<Shape>> initMesh(string local_path, vector<shared_ptr<Shape>> mesh) {
+vector<shared_ptr<Shape>> initMultiMesh(string local_path, vector<shared_ptr<Shape>> mesh) {
 	vector<tinyobj::shape_t> shapes;
 	vector<tinyobj::material_t> materials;
 	string errStr;
 	string resourceDir = "../resources";
+	bool rc;
+		
 	//cout << resourceDir + local_path << endl;
-	bool rc = tinyobj::LoadObj(shapes, materials, errStr, (resourceDir + local_path).c_str());
+	rc = tinyobj::LoadObj(shapes, materials, errStr, (resourceDir + local_path).c_str());
 	if (!rc) {
 		cerr << errStr << endl;
 	}
@@ -35,6 +37,28 @@ vector<shared_ptr<Shape>> initMesh(string local_path, vector<shared_ptr<Shape>> 
 			mesh.push_back(shapePart);
 		}
 	}
+
+	return mesh;
+}
+
+shared_ptr<Shape> initMesh(string local_path, shared_ptr<Shape> mesh) {
+	vector<tinyobj::shape_t> shapes;
+	vector<tinyobj::material_t> materials;
+	string errStr;
+	string resourceDir = "../resources";
+	bool rc;
+	rc = tinyobj::LoadObj(shapes, materials, errStr, (resourceDir + local_path).c_str());
+	if (!rc) {
+		cerr << errStr << endl;
+	}
+	else {
+		//for now all our shapes will not have textures - change in later labs
+		mesh = make_shared<Shape>();
+		mesh->createShape(shapes[0]);
+		mesh->measure();
+		mesh->init();
+	}
+
 	return mesh;
 }
 

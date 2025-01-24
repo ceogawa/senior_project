@@ -23,7 +23,7 @@ Press 'p' to toggle deferred shading
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#define NUM_LIGHTS 32
+#define NUM_LIGHTS 16
 
 using namespace std;
 using namespace glm;
@@ -47,12 +47,14 @@ public:
 	std::shared_ptr<Program> prog;
 	std::shared_ptr<Program> texProg;
 	std::shared_ptr<Program> deferProg;
-	vec3 light_positions[32]{};
+	vec3 light_positions[NUM_LIGHTS]{};
 	vec3 light_colors[NUM_LIGHTS]{};
 
 	vector<shared_ptr<Shape>> bookshelf;
 	vector<shared_ptr<Shape>> sofa;
 	vector<shared_ptr<Shape>> coffeetable;
+	vector<shared_ptr<Shape>> lamp;
+	shared_ptr<Shape> wall;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -126,10 +128,8 @@ public:
 		//		vec3 fragNor; 
 		// to the geometry frag shader
 		
-		//set up the shaders to blur the FBO just a PLACEHODLER pass thru now
-		//next lab modify and possibly add other shaders to complete blur
 
-		// TODO rewrite without texprog
+		// TODO texprog? modify to pass color to defer
 		texProg = make_shared<Program>();
 		texProg->setVerbose(true);
 		texProg->setShaderNames(
@@ -216,18 +216,25 @@ public:
 
 	void initLights() {
 		//Light lights[32]{};
-		// TODO rewrite light to include light color
+		// TODO determine color in artistic way
 		srand(0);
-		for (int i = 0; i < 32; ++i) {
+		for (int i = 0; i < NUM_LIGHTS; ++i) {
 			//vec3 lightPos = vec3(i, 8.0f, -2.0f);
 			float max_number = 13.0f;
 			float minimum_number = -10.0f; 
-			vec3 lightPos = vec3(rand() % 12, 40.0f, rand() % 12);
+			vec3 lightPos;
+			if (i % 2 == 0) {
+				lightPos = vec3(rand() % 5, 5.0f, -3.0f);
+			}
+			else {
+				lightPos = vec3(rand() % 5, 0.0f, (rand() % 10));
+			}
 			light_positions[i] = lightPos;
 			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
 			float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-			light_colors[i] = vec3(r, g, b);
+			//light_colors[i] = vec3(r, g, b);
+			light_colors[i] = vec3(0.7f);
 			cout << "light colors: " << r << ", " << g << ", " << b << endl;
 		}
 	}
@@ -260,9 +267,11 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-		sofa = initMesh("/objs/sofa.obj", sofa);
-		bookshelf = initMesh("/objs/bookcase.obj", bookshelf);
-		coffeetable = initMesh("/objs/coffee_table.obj", coffeetable);
+		sofa = initMultiMesh("/objs/sofa.obj", sofa);
+		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
+		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
+		wall = initMesh("/objs/wall.obj", wall);
+		lamp = initMultiMesh("/objs/desk_lamp.obj", lamp);
 
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
@@ -270,7 +279,7 @@ public:
 
 	void cameraUpdate() {
       //camera movement - made continuous while keypressed
-      float speed = 0.09;
+      float speed = 0.1;
       if (MOVEL){
         g_eye -= speed*strafe;
         g_lookAt -= speed*strafe;
@@ -287,10 +296,65 @@ public:
     }
 	
 
-	/*void geometry_pass() {
+	void drawGeometry() {
+		prog->bind();
+
+		// Create projection and view matricies
+		mat4 P = SetProjectionMatrix(prog);
+		mat4 V = SetView(prog);
+
+		// set model sets up Model matrix
+
+		// SOFA
+		for (int i = 0; i < sofa.size(); i++) {
+			/*mat4 scaleUnit = scale(mat4(1.0f), vec3(1.0 / (sofa[i]->max.x - sofa[i]->min.x)));
+			mat4 trans = translate(glm::mat4(1.0f), vec3(i, 0.5f, -1.0f));*/
+			SetModel(prog, vec3(0, 0.3f, -1.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			SetMaterial(0);
+			sofa[i]->draw(prog);
+		}
+
+		// COFFEE TABLE
+		for (int i = 0; i < coffeetable.size(); i++) {
+			SetModel(prog, vec3(1.0f, 0.3f, 0.9f), 0.0f, 0.0f, 0.012f, 0.009f, 0.011f);
+			SetMaterial(2);
+			coffeetable[i]->draw(prog);
+		}
+
+		// LAMP
+		for (int i = 0; i < lamp.size(); i++) {
+			SetModel(prog, vec3(1.4f, 0.7f, 0.9f), 3.14f , 0.0f, 2.0f, 2.0f, 2.0f);
+			SetMaterial(3);
+			lamp[i]->draw(prog);
+		}
+
+		//left wall
+		SetModel(prog, vec3(-4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		//right wall
+		SetModel(prog, vec3(4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		//back wall
+		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 0.0f, 1.5f, 0.55f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		// floor
+		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
+		// ceiling??
 
 
-	}*/
+		// unbind after geometry pass
+		prog->unbind();
+
+	}
 
 
 	void render(float frametime) {
@@ -317,39 +381,12 @@ public:
  
 		float aspect = width/(float)height;
 
-		//Draw our scene - meshes - right now to a texture
-		prog->bind();
+		// set up model, view, projection matrices
+		drawGeometry();
 
-		// Create the matrices
-		mat4 P = SetProjectionMatrix(prog);
-		mat4 V = SetView(prog);
-
-		// draw sofa
-		for (int i = 0; i < sofa.size(); i++) {
-			/*mat4 scaleUnit = scale(mat4(1.0f), vec3(1.0 / (sofa[i]->max.x - sofa[i]->min.x)));
-			mat4 trans = translate(glm::mat4(1.0f), vec3(i, 0.5f, -1.0f));*/
-			SetModel(prog, vec3(0, 0.5f, -1.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-			SetMaterial(1);
-			sofa[i]->draw(prog);
-		}
-
-		for (int i = 1; i < bookshelf.size(); i++) {
-			SetModel(prog, vec3(2.0f, 0.5f, 0.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-			SetMaterial(0);
-			bookshelf[i]->draw(prog);
-		}
-
-		for (int i = 0; i < coffeetable.size(); i++) {
-			SetModel(prog, vec3(-4.0f, 0.5f, -0.5f), 0.0f, 0.0f, 2.0f, 2.0f, 2.0f);
-			SetMaterial(2);
-			coffeetable[i]->draw(prog);
-		}
-
-		// unbind after geometry pass
-		prog->unbind();
-
+		
 		// TODO moving lights??
-	/*	for (int m = 0; m < 32; ++m) {
+		/*	for (int m = 0; m < 32; ++m) {
 			light_positions[m].x += 0.5 * sin(frametime);
 			light_positions[m].y += 0.2 * sin(frametime);
 			light_positions[m].z += 0.1 * sin(frametime);
@@ -375,6 +412,7 @@ public:
 			glUniform1i(deferProg->getUniform("gPosition"), 0);
 			glUniform1i(deferProg->getUniform("gNormal"), 1);
 			glUniform1i(deferProg->getUniform("gColorSpec"), 2);
+
 			glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
 			glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
 			glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
@@ -414,7 +452,6 @@ public:
 		texProg->unbind();
 	}
 
-
 	/* helper functions for sending matrix data to the GPU */
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
 		int width, height;
@@ -424,10 +461,6 @@ public:
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
 	}
- //	/* model transforms - normal */
-	//void SetModel(shared_ptr<Program> curS, mat4 m) {
-	//	glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(m));
-	//}
 
 	void SetModel(shared_ptr<Program> curS, vec3 trans, float rotY, float rotX, float sx, float sy, float sz) {
 		mat4 Trans = glm::translate(glm::mat4(1.0f), trans);
