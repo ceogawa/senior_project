@@ -21,7 +21,7 @@ struct Light{
 void main()
 {
 
-    float radius = 10.0;
+    float radius = 20.0;
     
     vec3 FragPos = texture(gPosition, texCoord).rgb;
     vec3 Normal = texture(gNormal, texCoord).rgb;
@@ -30,17 +30,22 @@ void main()
 
     vec3 lighting = Albedo * 0.01;
     vec3 viewDir = normalize(viewPos - FragPos);
-    for (int i = 0; i < NUM_LIGHTS; ++i){
+    for (int i = 1; i < NUM_LIGHTS; ++i){
         // if point is within radius
             // do lighting calculation
         float d = length(lightPos[i] - FragPos);
-        //if(d < radius){
+        if((d < radius) && d != 0){
             vec3 lightDir = normalize(lightPos[i] - FragPos);
             vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Albedo * lightCol[i];
-            //diffuse = diffuse/(d*d);
+            diffuse = diffuse/(d*d);
             lighting += diffuse;
-       // }    
+        }
     }
+
+    //   vec3 lightDir = normalize(lightPos[0] - FragPos);
+   // vec3 diffuse = max(dot(Normal, lightDir), 0.0) * Albedo * lightCol[0];
+    //diffuse = diffuse/(d*d);
+    //lighting += diffuse;
 
     //lighting *= 0.3;
     FragColor = vec4(lighting, 1.0);
