@@ -14,11 +14,13 @@ void main()
     // INITIALIZES THE GBUFFER WITH DATA
 
     // store the fragment position vector in the first gbuffer texture
+   // gl_FragCoord.z 
     gPosition = fragPos;
     // also store the per-fragment normals into the gbuffer
     gNormal = normalize(fragNor);
     // and the diffuse per-fragment color
     gAlbedoSpec.rgb = MatDif;
+    
     // store specular intensity in gAlbedoSpec's alpha component
     gAlbedoSpec.a = 0.1;
 } 

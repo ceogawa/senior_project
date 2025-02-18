@@ -19,6 +19,8 @@ Press 'p' to toggle deferred shading
 #include "WindowManager.h"
 #include "GLTextureWriter.h"
 #include "initGeom.h"
+#include "stb_image.h"
+#include "stb_image_write.h"
 
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
@@ -75,6 +77,7 @@ public:
 	GLuint depthBuf = 0;
 	GLuint lightPositions = 0;
 	GLuint lightColors = 0;
+	GLuint lightMap = 0;
 
 
 	bool FirstTime = true;
@@ -85,8 +88,8 @@ public:
 	double g_phi, g_theta;
 	vec3 view = vec3(0, 0, 1);
 	vec3 strafe = vec3(1, 0, 0);
-	vec3 g_eye = vec3(0, 1, 0);
-	vec3 g_lookAt = vec3(0, 1, -1);
+	vec3 g_eye = vec3(0, 1, 4);
+	vec3 g_lookAt = vec3(0, 1, -1); 
 	bool MOVEF = false;
 	bool MOVEB = false;
 	bool MOVER = false;
@@ -153,11 +156,10 @@ public:
 		deferProg->addUniform("gPosition");
 		deferProg->addUniform("gNormal");
 		deferProg->addUniform("gColorSpec");
-		// add list of lights to frag shader
-		deferProg->addUniform("lightPos");
-		deferProg->addUniform("lightCol");
+		// replace list of lights with lightmap
+		deferProg->addUniform("lightMap");
 		// cam
-		deferProg->addUniform("viewPos");
+		deferProg->addUniform("camPos");
 		// vertPos for shader. converts position to texcoord
 		deferProg->addAttribute("vertPos");
 
@@ -197,6 +199,28 @@ public:
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, DrawBuffers);
 
+		int lmap_width, lmap_height, nrChannels;
+		// "../resources/textures/light_map.png"
+		// ../resources/textures/light_map_with_depth1.jpg
+		unsigned char* lmap_data = stbi_load("../resources/textures/light_and_depth_map2.jpg", &lmap_width, &lmap_height, &nrChannels, STBI_rgb);
+
+		glGenTextures(1, &lightMap);
+		glBindTexture(GL_TEXTURE_2D, lightMap);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		if (lmap_data) {
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lmap_width, lmap_height, 0, GL_RGB, GL_UNSIGNED_BYTE, lmap_data);
+			glGenerateMipmap(GL_TEXTURE_2D);  // Generate mipmaps
+		}
+		else {
+			std::cerr << "Failed to load lightmap texture: " << stbi_failure_reason() << std::endl;
+		}
+
+		//cout << "lmap_data[0]" << lmap_data[0] << endl;
+		stbi_image_free(lmap_data);
 
 		glGenRenderbuffers(1, &depthBuf);
 		//set up depth necessary as rendering a mesh that needs depth test
@@ -408,14 +432,23 @@ public:
 			glBindTexture(GL_TEXTURE_2D, gNormal);
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_2D, gColorSpec);
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_2D, lightMap);
+
 
 			glUniform1i(deferProg->getUniform("gPosition"), 0);
 			glUniform1i(deferProg->getUniform("gNormal"), 1);
 			glUniform1i(deferProg->getUniform("gColorSpec"), 2);
 
-			glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
-			glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
-			glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
+			GLint loc = deferProg->getUniform("lightMap");
+			if (loc == -1) { std::cerr << "lightMap uniform not found!" << std::endl; }
+			glUniform1i(deferProg->getUniform("lightMap"), 3);
+
+			//glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
+			//glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
+			glUniform3f(deferProg->getUniform("camPos"), g_eye.x, g_eye.y, g_eye.z);
+			//glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
+			//glUniform3f(deferProg->getUniform("lookAt"), g_lookAt.x, g_lookAt.y, g_lookAt.z);
 
 			glEnableVertexAttribArray(0);
 			glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
@@ -457,6 +490,7 @@ public:
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		float aspect = width/(float)height;
+		
 		mat4 Projection = perspective(radians(50.0f), aspect, 0.1f, 100.0f);
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
