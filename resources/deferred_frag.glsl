@@ -18,7 +18,7 @@ void main() {
     vec3 Albedo = texture(gColorSpec, texCoord).rgb;
     float Spec = texture(gColorSpec, texCoord).a;
     vec3 Light = texture(lightMap, texCoord).rgb; // black and white image
-    float scene_depth = gl_FragCoord.z;
+    float depth = gl_FragCoord.z;
 
     vec3 lighting = Albedo * 0.01;
     vec3 lightDir = normalize(camPos - FragPos);
@@ -36,16 +36,17 @@ void main() {
 
     vec2 texSize = 1.0 / textureSize(lightMap, 0);
     float blur_radius = 6.0f;
-    float blendedIntensity = 0.0f;
+    float blendedIntensity = 0.1f;
 
     for(int i = 0; i < 9; i++){
         blendedIntensity += (texture(lightMap, texCoord + (offset[i] * texSize * blur_radius))).r * gaussian[i];
     }
     
-    vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo;
+    vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo ;
 
 
     lighting += diffuse;
     FragColor = vec4(lighting, 1.0);
+
 
 } 

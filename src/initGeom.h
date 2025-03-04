@@ -21,7 +21,7 @@ vector<shared_ptr<Shape>> initMultiMesh(string local_path, vector<shared_ptr<Sha
 	string errStr;
 	string resourceDir = "../resources";
 	bool rc;
-		
+	// TODO CHECK does resourceDir + local_path exist
 	//cout << resourceDir + local_path << endl;
 	rc = tinyobj::LoadObj(shapes, materials, errStr, (resourceDir + local_path).c_str());
 	if (!rc) {

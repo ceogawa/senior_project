@@ -15,6 +15,7 @@ void main()
 
     // store the fragment position vector in the first gbuffer texture
    // gl_FragCoord.z 
+   // TODO we want to store the z coordinate normalized based on the frustum.  
     gPosition = fragPos;
     // also store the per-fragment normals into the gbuffer
     gNormal = normalize(fragNor);

@@ -1,4 +1,4 @@
-/*
+﻿/*
 Base code for deferred shading
 Winter 2017, updated May 2020, May 2022- ZJW (Piddington texture write)
 Press 'p' to toggle deferred shading
@@ -6,7 +6,7 @@ Press 'p' to toggle deferred shading
 
 // learnopengl for deferred assistance
 
-
+// TODO replace room models with new table
 
 #include <chrono>
 #include <iostream>
@@ -25,7 +25,6 @@ Press 'p' to toggle deferred shading
 // value_ptr for glm
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#define NUM_LIGHTS 16
 
 using namespace std;
 using namespace glm;
@@ -49,14 +48,20 @@ public:
 	std::shared_ptr<Program> prog;
 	std::shared_ptr<Program> texProg;
 	std::shared_ptr<Program> deferProg;
-	vec3 light_positions[NUM_LIGHTS]{};
-	vec3 light_colors[NUM_LIGHTS]{};
+	shared_ptr<Program> frontProg;
+	shared_ptr<Program> backProg;
+	shared_ptr<Program> ambientProg;
+	shared_ptr<Program> volumesNoCullingProg;
+	shared_ptr<Program> screenProg;
+
+	vector<Light> lights;
 
 	vector<shared_ptr<Shape>> bookshelf;
 	vector<shared_ptr<Shape>> sofa;
 	vector<shared_ptr<Shape>> coffeetable;
 	vector<shared_ptr<Shape>> lamp;
 	shared_ptr<Shape> wall;
+	shared_ptr<Shape> lightVolume;
 
 	// Contains vertex information for OpenGL
 	GLuint VertexArrayID;
@@ -75,9 +80,12 @@ public:
 	GLuint gNormal = 0;
 	GLuint gColorSpec = 0;
 	GLuint depthBuf = 0;
+	GLuint lightDepthBuf = 0; 
 	GLuint lightPositions = 0;
 	GLuint lightColors = 0;
 	GLuint lightMap = 0;
+	GLuint lightAccumulationBuf = 0;
+	GLuint lightAccumulationTexture = 0; 
 
 
 	bool FirstTime = true;
@@ -164,8 +172,85 @@ public:
 		deferProg->addAttribute("vertPos");
 
 
-		initBuffers();
+		frontProg = make_shared<Program>();
+		frontProg->setVerbose(true);
+		frontProg->setShaderNames(
+			resourceDirectory + "/pointlight_front_vert.glsl",
+			resourceDirectory + "/pointlight_front_frag.glsl"
+		);
+		frontProg->init();
+		frontProg->addUniform("P");
+		frontProg->addUniform("V");
+		frontProg->addUniform("M");
+		frontProg->addAttribute("vertPos");
+		//frontProg->addAttribute("vertNor");
 
+		backProg = make_shared<Program>();
+		backProg->setVerbose(true);
+		backProg->setShaderNames(
+			resourceDirectory + "/pointlight_back_vert.glsl",
+			resourceDirectory + "/pointlight_back_frag.glsl"
+		);
+		backProg->init();
+		// add gbuffer uniforms to frag shader
+		backProg->addUniform("gPosition");
+		backProg->addUniform("gNormal");
+		backProg->addUniform("gColorSpec");
+		backProg->addUniform("lightPos");
+		backProg->addUniform("lightCol");
+		backProg->addUniform("P");
+		backProg->addUniform("V");
+		backProg->addUniform("M");
+		backProg->addAttribute("vertPos");
+
+		ambientProg = make_shared<Program>();
+		ambientProg->setVerbose(true);
+		ambientProg->setShaderNames(
+			resourceDirectory + "/ambient_pass_vert.glsl",
+			resourceDirectory + "/ambient_pass_frag.glsl"
+		);
+		ambientProg->init();
+		ambientProg->addUniform("P");
+		ambientProg->addUniform("V");
+		ambientProg->addUniform("M");
+		ambientProg->addAttribute("vertPos"); 
+		ambientProg->addUniform("gColorSpec");
+
+		// Light Volumes Deferred Render Pass, No Stencil Culling
+		volumesNoCullingProg = make_shared<Program>();
+		volumesNoCullingProg->setVerbose(true);
+		volumesNoCullingProg->setShaderNames(
+			resourceDirectory + "/lightvolume_no_culling_vert.glsl",
+			resourceDirectory + "/lightvolume_no_culling_frag.glsl"
+		);
+		volumesNoCullingProg->init();
+		// add gbuffer uniforms to frag shader
+		volumesNoCullingProg->addUniform("gPosition");
+		volumesNoCullingProg->addUniform("gNormal");
+		volumesNoCullingProg->addUniform("gColorSpec");
+		volumesNoCullingProg->addUniform("lightPos");
+		volumesNoCullingProg->addUniform("lightCol");
+		volumesNoCullingProg->addUniform("P");
+		volumesNoCullingProg->addUniform("V");
+		volumesNoCullingProg->addUniform("M");
+		volumesNoCullingProg->addAttribute("vertPos");
+		volumesNoCullingProg->addAttribute("vertNor");
+
+		// Shader that renders light accumulation to the screen
+		screenProg = make_shared<Program>();
+		screenProg->setVerbose(true);
+		screenProg->setShaderNames( 
+			resourceDirectory + "/screen_vert.glsl",
+			resourceDirectory + "/screen_frag.glsl"
+		);
+		screenProg->init();
+		screenProg->addUniform("lightAccumulation");
+		screenProg->addUniform("P");
+		screenProg->addUniform("V");
+		screenProg->addUniform("M");
+		screenProg->addAttribute("vertPos"); 
+
+		initBuffers();
 
 	}
 
@@ -176,7 +261,6 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, 0);
-
 	}
 	
 	void initBuffers( ) {
@@ -186,6 +270,7 @@ public:
 		glGenFramebuffers(1, &gBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
+
 		// - position color buffer
 		// TODO rewrite with createFBO()
 		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0);
@@ -193,40 +278,50 @@ public:
 		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2);
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2); 
 
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 		glDrawBuffers(3, DrawBuffers);
-
-		int lmap_width, lmap_height, nrChannels;
-		// "../resources/textures/light_map.png"
-		// ../resources/textures/light_map_with_depth1.jpg
-		unsigned char* lmap_data = stbi_load("../resources/textures/light_and_depth_map2.jpg", &lmap_width, &lmap_height, &nrChannels, STBI_rgb);
-
-		glGenTextures(1, &lightMap);
-		glBindTexture(GL_TEXTURE_2D, lightMap);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		if (lmap_data) {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lmap_width, lmap_height, 0, GL_RGB, GL_UNSIGNED_BYTE, lmap_data);
-			glGenerateMipmap(GL_TEXTURE_2D);  // Generate mipmaps
-		}
-		else {
-			std::cerr << "Failed to load lightmap texture: " << stbi_failure_reason() << std::endl;
+		GLenum check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (check != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "ERROR: GBUFFER is not complete! " << check << std::endl;
 		}
 
-		//cout << "lmap_data[0]" << lmap_data[0] << endl;
-		stbi_image_free(lmap_data);
-
+		//////////////////////////////////////////////////////////////////////////////////////////////
 		glGenRenderbuffers(1, &depthBuf);
 		//set up depth necessary as rendering a mesh that needs depth test
 		glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+		// error check if framebuffer is complete
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+			std::cout << "Framebuffer not complete!" << std::endl;
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		///////////////////////////////////////////////////////////////////////////////////////////////
+		// // TODO DO I NEED TO BIND THE DEPTH BUFFER TOO???
+        // generate the light accumulation buffer
+		glGenFramebuffers(1, &lightAccumulationBuf);
+		// bind to buffer
+		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
+		// create texture 
+		createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT3); 
+		GLenum DrawBuff[1] = { GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(1, DrawBuff);
+		check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (check != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "ERROR: lightAccumulationBuf is not complete! " << check << std::endl;
+		}
+
+		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+		
+		//// DO I USE THE SAME DEPTH BUFFER?
+		glGenRenderbuffers(1, &lightDepthBuf);
+		//set up depth necessary as rendering a mesh that needs depth test
+		glBindRenderbuffer(GL_RENDERBUFFER, lightDepthBuf);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, lightDepthBuf);
 		// error check if framebuffer is complete
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			std::cout << "Framebuffer not complete!" << std::endl;
@@ -240,26 +335,37 @@ public:
 
 	void initLights() {
 		//Light lights[32]{};
-		// TODO determine color in artistic way
-		srand(0);
-		for (int i = 0; i < NUM_LIGHTS; ++i) {
-			//vec3 lightPos = vec3(i, 8.0f, -2.0f);
-			float max_number = 13.0f;
-			float minimum_number = -10.0f; 
-			vec3 lightPos;
-			if (i % 2 == 0) {
-				lightPos = vec3(rand() % 5, 5.0f, -3.0f);
-			}
-			else {
-				lightPos = vec3(rand() % 5, 0.0f, (rand() % 10));
-			}
-			light_positions[i] = lightPos;
-			float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-			float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-			float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-			//light_colors[i] = vec3(r, g, b);
-			light_colors[i] = vec3(0.7f);
-			cout << "light colors: " << r << ", " << g << ", " << b << endl;
+		// REMOVE old way of determining lilght positions and colors
+		//srand(0);
+		//for (int i = 0; i < NUM_LIGHTS; ++i) {
+		//	//vec3 lightPos = vec3(i, 8.0f, -2.0f);
+		//	float max_number = 13.0f;
+		//	float minimum_number = -10.0f; 
+		//	vec3 lightPos;
+		//	if (i % 2 == 0) {
+		//		lightPos = vec3(rand() % 5, 5.0f, -3.0f);
+		//	}
+		//	else {
+		//		lightPos = vec3(rand() % 5, 0.0f, (rand() % 10));
+		//	}
+		//	light_positions[i] = lightPos;
+		//	float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		//	float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		//	float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
+		//	//light_colors[i] = vec3(r, g, b);
+		//	light_colors[i] = vec3(0.7f);
+		//	cout << "light colors: " << r << ", " << g << ", " << b << endl;
+		//}
+
+		// TODO WIP light placement
+	    // ambient ceiling lights
+		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
+
+		// lights behind couch
+		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
+			lights.push_back({glm::vec3(x, 0.1f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
 		}
 	}
 
@@ -296,6 +402,8 @@ public:
 		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
 		wall = initMesh("/objs/wall.obj", wall);
 		lamp = initMultiMesh("/objs/desk_lamp.obj", lamp);
+		// use sphere mesh to represent light volume
+		lightVolume = initMesh("/objs/sphere.obj", lightVolume);
 
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
@@ -374,12 +482,10 @@ public:
 
 		// ceiling??
 
-
 		// unbind after geometry pass
 		prog->unbind();
 
 	}
-
 
 	void render(float frametime) {
 		// Get current frame buffer size.
@@ -390,81 +496,75 @@ public:
 		 //camera movement - made continuous while keypressed
 		cameraUpdate();
 
-		if (DEFER)
-		{
-			// bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
-			glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-		}
-		else
-		{
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		}
-
+        // bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
+		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 		// Clear framebuffer.
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
 		float aspect = width/(float)height;
 
-		// set up model, view, projection matrices
+		// GEOMETRY PASS (sets up gbuffer for scene)
 		drawGeometry();
 
+		// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
+		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
+		// clear the color buffer before all light computations
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE); 
 		
-		// TODO moving lights??
-		/*	for (int m = 0; m < 32; ++m) {
-			light_positions[m].x += 0.5 * sin(frametime);
-			light_positions[m].y += 0.2 * sin(frametime);
-			light_positions[m].z += 0.1 * sin(frametime);
-		}*/
-		
+		volumesNoCullingProg->bind();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gPosition);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gNormal);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, gColorSpec);
 
-		if (!FirstTime)
-		{
-			// now draw the actual output 
-			// render to the screen LIGHTING PASS
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		mat4 P = SetProjectionMatrix(volumesNoCullingProg); 
+		mat4 V = SetView(volumesNoCullingProg);
+		glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
+		glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
+		glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
 
-			deferProg->bind();
-			// bind textures for pos, normals, color
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, gPosition);
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, gNormal);
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_2D, gColorSpec);
-			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_2D, lightMap);
+		for (const Light& light : lights) {
+			glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+			glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
 
-
-			glUniform1i(deferProg->getUniform("gPosition"), 0);
-			glUniform1i(deferProg->getUniform("gNormal"), 1);
-			glUniform1i(deferProg->getUniform("gColorSpec"), 2);
-
-			GLint loc = deferProg->getUniform("lightMap");
-			if (loc == -1) { std::cerr << "lightMap uniform not found!" << std::endl; }
-			glUniform1i(deferProg->getUniform("lightMap"), 3);
-
-			//glUniform3fv(deferProg->getUniform("lightPos"), NUM_LIGHTS, &light_positions[0].x);
-			//glUniform3fv(deferProg->getUniform("lightCol"), NUM_LIGHTS, &light_colors[0].x);
-			glUniform3f(deferProg->getUniform("camPos"), g_eye.x, g_eye.y, g_eye.z);
-			//glUniform3f(deferProg->getUniform("viewPos"), view.x, view.y, view.z);
-			//glUniform3f(deferProg->getUniform("lookAt"), g_lookAt.x, g_lookAt.y, g_lookAt.z);
-
-			glEnableVertexAttribArray(0);
-			glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-			glDrawArrays(GL_TRIANGLES, 0, 6);
-			glDisableVertexAttribArray(0);
-
-			deferProg->unbind();
-
+			SetModel(volumesNoCullingProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			lightVolume->draw(volumesNoCullingProg);
 		}
+		volumesNoCullingProg->unbind();
+		glDisable(GL_BLEND);
+
+		// new shader to write to screen
+		screenProg->bind();
+		// bind to the screen
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// bind lightAccumulation texture and send uniforms to the screenShader
+		glActiveTexture(GL_TEXTURE3); 
+		glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+		glUniform1i(screenProg->getUniform("lightAccumulation"), 0);
+		P = SetProjectionMatrix(screenProg);
+		V = SetView(screenProg);
+
+		// draw quad with texture
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDisableVertexAttribArray(0);
+		screenProg->unbind();
+
 		//code to write out the FBO (texture) just once -an example
 		if (FirstTime) {
 				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+				assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBUF.png"));
+				assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
 				FirstTime = false;
 		}
 	}
@@ -625,10 +725,10 @@ public:
 		glUniform3f(prog->getUniform("MatAmb"), 0.3294f, 0.2235f, 0.02745f);
 		glUniform3f(prog->getUniform("MatDif"), 0.7804f, 0.5686f, 0.11373f);
 		break;
-		 case 3: //copper
-		 glUniform3f(prog->getUniform("MatAmb"), 0.1913f, 0.0735f, 0.0225f);
-		 glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
-		 break;
+		case 3: //copper
+		glUniform3f(prog->getUniform("MatAmb"), 0.1913f, 0.0735f, 0.0225f);
+		glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
+		break;
 		}
 	}
 };

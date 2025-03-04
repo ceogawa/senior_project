@@ -1,0 +1,115 @@
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// blends the computed fragment with the previous value in color buffer
+		// TODO maybe clear color first? 
+		//glClear(GL_COLOR_BUFFER_BIT);
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_ONE, GL_ONE);
+
+		ambientPass(); // for now not doing anything
+
+		//// 3. enable stencil testing 
+		//// conditionally eliminates pixels based on comparison test
+		glEnable(GL_STENCIL_TEST);
+		//// 7. enable face culling to only view front faces
+		glEnable(GL_CULL_FACE);
+	
+		for (const Light& light : lights) {
+
+			glEnable(GL_DEPTH_TEST);
+		//	// FRONT PASS
+		//	// 1. disable writing to the color buffer for the first pass
+			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+		//	// 2. disable writing to the depth buffer for the first pass
+			glDepthMask(GL_FALSE);
+
+		//	// 4. init the stencil buffer to 0
+			glClear(GL_STENCIL_BUFFER_BIT);
+		//	// 5. func = always, ref = 0, mask = 0xFF
+		//	// we set this to always because we want every fragment 
+		//	// to pass the stencil test so we can check the DEPTH
+			glStencilFunc(GL_EQUAL, 0, 0xFF);
+		//	//glDepthFunc(GL_GEQUAL); // DO THE DEPTH TEST TOO ??
+		//	// 6. configure the stencil operations to keep frag
+		//	// for all front facing polygons:
+		//	//    if the stencil fails (it wont) then keep stencil value
+		//	//    if the stencil passes but the depth fails, keep the stencil value
+		//	//    if the stencil and the depth pass, increment (discard)
+			glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR);
+
+		//	// 8. cull back faces
+			glCullFace(GL_BACK);
+
+		//	// 9. bind, send uniforms, draw
+			frontProg->bind();
+
+			mat4 P = SetProjectionMatrix(frontProg);
+			mat4 V = SetView(frontProg);
+			SetModel(frontProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+
+			lightVolume->draw(frontProg);
+
+			frontProg->unbind();
+
+		//	// BACK PASS
+		//	// 1. reenable color buffer
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		//	// 2. change stencil func
+		//	// Set stencil function to only pass where stencil value equals 0
+		//	// This means we only light pixels that were "missed" by the front faces
+		//	// These are the pixels actually inside the light volume
+			glStencilFunc(GL_EQUAL, 0, 0xFF);
+
+		//	// 3. cull FRONT faces
+			glCullFace(GL_FRONT);
+
+			backProg->bind();
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, gPosition); 
+			glActiveTexture(GL_TEXTURE1); 
+			glBindTexture(GL_TEXTURE_2D, gNormal); 
+			glActiveTexture(GL_TEXTURE2); 
+			glBindTexture(GL_TEXTURE_2D, gColorSpec); 
+
+			GLint loc = deferProg->getUniform("gPosition");
+			if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
+			glUniform1i(backProg->getUniform("gPosition"), 0);
+			glUniform1i(backProg->getUniform("gNormal"), 1);
+			glUniform1i(backProg->getUniform("gColorSpec"), 2);
+			glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+			glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+
+			P = SetProjectionMatrix(backProg);
+			V = SetView(backProg);
+			SetModel(backProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			lightVolume->draw(backProg);
+
+			// I removed the quad draw, and put it outside the loop
+	/*		glDisable(GL_CULL_FACE);
+			glDisable(GL_DEPTH_TEST);
+			glEnableVertexAttribArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			glDisableVertexAttribArray(0);*/
+
+			backProg->unbind(); 
+
+
+		} 
+
+		/*finalShader->bind();
+		// should i move this outside the for loop?
+		// do I now need a separate shader to render the final color buffer to screen and add an ambient light contribution
+		glDisable(GL_CULL_FACE);
+		// disable depth test and reenable at start of loop
+		glDisable(GL_DEPTH_TEST);
+		glEnableVertexAttribArray(0);
+		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glDisableVertexAttribArray(0);
+
+		finalShader->unbind();*/
+
+		glDisable(GL_BLEND);
