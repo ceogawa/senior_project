@@ -28,7 +28,7 @@ vector<shared_ptr<Shape>> initMultiMesh(string local_path, vector<shared_ptr<Sha
 		cerr << errStr << endl;
 	}
 	else {
-		shared_ptr<Shape> shapePart;
+		shared_ptr<Shape> shapePart; 
 		for (int i = 0; i < shapes.size(); i++) {
 			shapePart = make_shared<Shape>();
 			shapePart->createShape(shapes[i]);

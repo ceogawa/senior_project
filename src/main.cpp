@@ -254,13 +254,13 @@ public:
 
 	}
 
-	void createBuffer(GLuint *buffer, int width, int height, GLenum attachment) {
+	void createBuffer(GLuint *buffer, int width, int height, GLenum attachment, GLuint level) {
 		glGenTextures(1, buffer);
 		glBindTexture(GL_TEXTURE_2D, *buffer);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, level);
 	}
 	
 	void initBuffers( ) {
@@ -273,12 +273,12 @@ public:
 
 		// - position color buffer
 		// TODO rewrite with createFBO()
-		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0);
+		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0, 0);
 		// - normal color buffer
-		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1);
+		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1, 0);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2); 
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0); 
 
 		//more FBO set up
 		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
@@ -287,7 +287,6 @@ public:
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
 			std::cerr << "ERROR: GBUFFER is not complete! " << check << std::endl;
 		}
-
 		//////////////////////////////////////////////////////////////////////////////////////////////
 		glGenRenderbuffers(1, &depthBuf);
 		//set up depth necessary as rendering a mesh that needs depth test
@@ -306,8 +305,8 @@ public:
 		// bind to buffer
 		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
 		// create texture 
-		createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT3); 
-		GLenum DrawBuff[1] = { GL_COLOR_ATTACHMENT3 };
+		createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT0, 0); 
+		GLenum DrawBuff[1] = {GL_COLOR_ATTACHMENT0};
 		glDrawBuffers(1, DrawBuff);
 		check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
@@ -319,7 +318,7 @@ public:
 		//// DO I USE THE SAME DEPTH BUFFER?
 		glGenRenderbuffers(1, &lightDepthBuf);
 		//set up depth necessary as rendering a mesh that needs depth test
-		glBindRenderbuffer(GL_RENDERBUFFER, lightDepthBuf);
+		glBindRenderbuffer(GL_RENDERBUFFER, lightDepthBuf); 
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, lightDepthBuf);
 		// error check if framebuffer is complete
@@ -329,33 +328,10 @@ public:
 
 		initLights();
 
-
 	}
 
 
 	void initLights() {
-		//Light lights[32]{};
-		// REMOVE old way of determining lilght positions and colors
-		//srand(0);
-		//for (int i = 0; i < NUM_LIGHTS; ++i) {
-		//	//vec3 lightPos = vec3(i, 8.0f, -2.0f);
-		//	float max_number = 13.0f;
-		//	float minimum_number = -10.0f; 
-		//	vec3 lightPos;
-		//	if (i % 2 == 0) {
-		//		lightPos = vec3(rand() % 5, 5.0f, -3.0f);
-		//	}
-		//	else {
-		//		lightPos = vec3(rand() % 5, 0.0f, (rand() % 10));
-		//	}
-		//	light_positions[i] = lightPos;
-		//	float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-		//	float g = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-		//	float b = static_cast <float> (rand()) / static_cast <float> (RAND_MAX);
-		//	//light_colors[i] = vec3(r, g, b);
-		//	light_colors[i] = vec3(0.7f);
-		//	cout << "light colors: " << r << ", " << g << ", " << b << endl;
-		//}
 
 		// TODO WIP light placement
 	    // ambient ceiling lights
@@ -397,7 +373,7 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-		sofa = initMultiMesh("/objs/sofa.obj", sofa);
+		sofa = initMultiMesh("/objs/sofa.obj", sofa); 
 		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
 		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
 		wall = initMesh("/objs/wall.obj", wall);
@@ -433,7 +409,7 @@ public:
 
 		// Create projection and view matricies
 		mat4 P = SetProjectionMatrix(prog);
-		mat4 V = SetView(prog);
+		mat4 V = SetView(prog); 
 
 		// set model sets up Model matrix
 
@@ -510,7 +486,10 @@ public:
 		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
 		// clear the color buffer before all light computations
 
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);  
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+		glClearColor(1, 0, 0, 1);
+		glDepthMask(GL_FALSE);
+
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE); 
 		
@@ -533,21 +512,31 @@ public:
 			glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
 
 			SetModel(volumesNoCullingProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-			lightVolume->draw(volumesNoCullingProg);
+			lightVolume->draw(volumesNoCullingProg); 
 		}
 		volumesNoCullingProg->unbind();
 		glDisable(GL_BLEND);
+		
 
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		// new shader to write to screen
 		screenProg->bind();
 		// bind to the screen
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// Unbind previous textures??????????
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, 0);
+		/*glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, 0);*/
+
 		// bind lightAccumulation texture and send uniforms to the screenShader
-		glActiveTexture(GL_TEXTURE3); 
+		// the active texture and the second param of glUniform1i should be the same
+		glActiveTexture(GL_TEXTURE0); 
 		glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
-		glUniform1i(screenProg->getUniform("lightAccumulation"), 0);
+		glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
 		P = SetProjectionMatrix(screenProg);
-		V = SetView(screenProg);
+		V = SetView(screenProg); 
 
 		// draw quad with texture
 		glEnableVertexAttribArray(0);
@@ -557,20 +546,21 @@ public:
 		glDisableVertexAttribArray(0);
 		screenProg->unbind();
 
+		glDepthMask(GL_TRUE);
+
 		//code to write out the FBO (texture) just once -an example
 		if (FirstTime) {
 				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
-				assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBUF.png"));
+				assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
 				assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
 				FirstTime = false;
 		}
 	}
 	
-	void DrawQuad(GLuint inTex) {
-
+	/*void DrawQuad(GLuint inTex) {
 		// example applying of 'drawing' the FBO texture - change shaders
 		texProg->bind();
 		glActiveTexture(GL_TEXTURE0);
@@ -583,8 +573,8 @@ public:
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glDisableVertexAttribArray(0);
 		texProg->unbind();
-	}
-
+	}*/
+	 
 	/* helper functions for sending matrix data to the GPU */
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
 		int width, height;

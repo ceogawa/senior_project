@@ -1,15 +1,17 @@
 #version 330 core
+layout(location = 0) out vec4 lightAccumulationTexture; // using colorattachment0 now for now
+
 in vec2 texCoord;
 
 uniform sampler2D gPosition;
 uniform sampler2D gNormal;
-uniform sampler2D gColorSpec;
+uniform sampler2D gColorSpec; 
 
 uniform vec3 lightPos;
 uniform vec3 lightCol;
 //float lightRadius;
 
-out vec4 FragColor;
+//out vec4 FragColor;
 
 void main() {
 // THEN resample depth information and convert back from normalized value
@@ -33,6 +35,7 @@ void main() {
     }
 
     lighting += diffuse;
-    FragColor = vec4(lighting, 1.0);
+    //FragColor = vec4(lighting, 1.0); // instead of setting fragcolor?
+    lightAccumulationTexture = vec4(lighting, 1.0); // Write to light accumulation buffer ? CHATGPT
 
 } 
