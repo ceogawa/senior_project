@@ -47,6 +47,7 @@ public:
 	// Our shader program
 	std::shared_ptr<Program> prog;
 	std::shared_ptr<Program> texProg;
+	std::shared_ptr<Program> norProg;
 	std::shared_ptr<Program> deferProg;
 	shared_ptr<Program> frontProg;
 	shared_ptr<Program> backProg;
@@ -220,35 +221,36 @@ public:
 		volumesNoCullingProg = make_shared<Program>();
 		volumesNoCullingProg->setVerbose(true);
 		volumesNoCullingProg->setShaderNames(
-			resourceDirectory + "/lightvolume_no_culling_vert.glsl",
+			resourceDirectory + "/screen_vert.glsl",
 			resourceDirectory + "/lightvolume_no_culling_frag.glsl"
 		);
 		volumesNoCullingProg->init();
 		// add gbuffer uniforms to frag shader
 		volumesNoCullingProg->addUniform("gPosition");
 		volumesNoCullingProg->addUniform("gNormal");
-		volumesNoCullingProg->addUniform("gColorSpec");
-		volumesNoCullingProg->addUniform("lightPos");
-		volumesNoCullingProg->addUniform("lightCol");
-		volumesNoCullingProg->addUniform("P");
-		volumesNoCullingProg->addUniform("V");
-		volumesNoCullingProg->addUniform("M");
+		volumesNoCullingProg->addUniform("gColorSpec"); 
+		volumesNoCullingProg->addUniform("lightBuf");
+		//volumesNoCullingProg->addUniform("lightPos");
+		//volumesNoCullingProg->addUniform("lightCol");
 		volumesNoCullingProg->addAttribute("vertPos");
-		volumesNoCullingProg->addAttribute("vertNor");
+		//volumesNoCullingProg->addAttribute("vertNor");
 
-		// Shader that renders light accumulation to the screen
-		screenProg = make_shared<Program>();
-		screenProg->setVerbose(true);
-		screenProg->setShaderNames( 
-			resourceDirectory + "/screen_vert.glsl",
-			resourceDirectory + "/screen_frag.glsl"
-		);
-		screenProg->init();
-		screenProg->addUniform("lightAccumulation");
-		screenProg->addUniform("P");
-		screenProg->addUniform("V");
-		screenProg->addUniform("M");
-		screenProg->addAttribute("vertPos"); 
+		// Initialize the GLSL program.
+		norProg = make_shared<Program>();
+		norProg->setVerbose(true);
+		norProg->setShaderNames(
+			resourceDirectory + "/simple_vert.glsl",
+			resourceDirectory + "/nor_frag.glsl");
+		if (!norProg->init())
+		{
+			std::cerr << "One or more shaders failed to compile... exiting!" << std::endl;
+			exit(1);
+		}
+		norProg->addUniform("P");
+		norProg->addUniform("M");
+		norProg->addUniform("V");
+		norProg->addAttribute("vertPos");
+		norProg->addAttribute("vertNor");
 
 		initBuffers();
 
@@ -265,14 +267,13 @@ public:
 	
 	void initBuffers( ) {
 		int width, height;
-		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
+		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height); 
 
 		glGenFramebuffers(1, &gBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
-
 		// - position color buffer
-		// TODO rewrite with createFBO()
+		// identical buffer creation AS BEFORE/PREVIOUSLY
 		createBuffer(&gPosition, width, height, GL_COLOR_ATTACHMENT0, 0);
 		// - normal color buffer
 		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1, 0);
@@ -280,13 +281,14 @@ public:
 		// use alpha channel of texture to decide specular intensity
 		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0); 
 
-		//more FBO set up
-		GLenum DrawBuffers[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
-		glDrawBuffers(3, DrawBuffers);
 		GLenum check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
 			std::cerr << "ERROR: GBUFFER is not complete! " << check << std::endl;
 		}
+		// Just reuse gDepthBuf
+
+		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+
 		//////////////////////////////////////////////////////////////////////////////////////////////
 		glGenRenderbuffers(1, &depthBuf);
 		//set up depth necessary as rendering a mesh that needs depth test
@@ -296,35 +298,45 @@ public:
 		// error check if framebuffer is complete
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			std::cout << "Framebuffer not complete!" << std::endl;
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		//more FBO set up
+		GLenum DrawBuffers[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, DrawBuffers);
+
 
 		///////////////////////////////////////////////////////////////////////////////////////////////
-		// // TODO DO I NEED TO BIND THE DEPTH BUFFER TOO???
         // generate the light accumulation buffer
 		glGenFramebuffers(1, &lightAccumulationBuf);
-		// bind to buffer
-		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
-		// create texture 
-		createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT0, 0); 
-		GLenum DrawBuff[1] = {GL_COLOR_ATTACHMENT0};
-		glDrawBuffers(1, DrawBuff);
-		check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-		if (check != GL_FRAMEBUFFER_COMPLETE) {
-			std::cerr << "ERROR: lightAccumulationBuf is not complete! " << check << std::endl;
-		}
+		glGenTextures(1, &lightAccumulationTexture);
+		// do I call gen again?
+		glGenRenderbuffers(1, &depthBuf);
 
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
-		
-		//// DO I USE THE SAME DEPTH BUFFER?
-		glGenRenderbuffers(1, &lightDepthBuf);
-		//set up depth necessary as rendering a mesh that needs depth test
-		glBindRenderbuffer(GL_RENDERBUFFER, lightDepthBuf); 
+		// PREVIOUSLY
+		// bind to buffer
+		//glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);k
+		//createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT0, 0); 
+				//glGenTextures(1, buffer);
+				//glBindTexture(GL_TEXTURE_2D, *buffer);
+				//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+				//glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, level);
+
+		// BASE CODE
+		createFBO(lightAccumulationBuf, lightAccumulationTexture);
+		//set up depth necessary since we are rendering a mesh that needs depth test
+		//yes need this for lights if you want their full geom with depth resolved
+		glBindRenderbuffer(GL_RENDERBUFFER, depthBuf);
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, lightDepthBuf);
-		// error check if framebuffer is complete
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			std::cout << "Framebuffer not complete!" << std::endl;
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
+
+
+		GLenum DrawBuffer[1] = { GL_COLOR_ATTACHMENT0 };
+		glDrawBuffers(1, DrawBuffer);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// DO I NEED THIS?
+		//createFBO(LframeBuf[1], LtexBuf[1]); ??
 
 		initLights();
 
@@ -373,6 +385,9 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
+		//Initialize the geometry to render a quad to the screen
+		initQuad();
+
 		sofa = initMultiMesh("/objs/sofa.obj", sofa); 
 		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
 		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
@@ -381,8 +396,6 @@ public:
 		// use sphere mesh to represent light volume
 		lightVolume = initMesh("/objs/sphere.obj", lightVolume);
 
-		//Initialize the geometry to render a quad to the screen
-		initQuad();
 	}
 
 	void cameraUpdate() {
@@ -482,82 +495,178 @@ public:
 		// GEOMETRY PASS (sets up gbuffer for scene)
 		drawGeometry();
 
-		// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
+		// PREVIOUSLY AND BASE CODE
+		//// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
 		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
-		// clear the color buffer before all light computations
-
+		//// clear the color buffer before all light computations
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
-		glClearColor(1, 0, 0, 1);
-		glDepthMask(GL_FALSE);
+		norProg->bind();
+		mat4 P = SetProjectionMatrix(norProg); 
+		mat4 V = SetView(norProg);
 
-		glEnable(GL_BLEND);
-		glBlendFunc(GL_ONE, GL_ONE); 
-		
-		volumesNoCullingProg->bind();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, gPosition);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, gNormal);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, gColorSpec);
+		//glEnable(GL_CULL_FACE);
+		//glCullFace(GL_FRONT);  // TODO this is not a long term solution
+		//glDepthFunc(GL_GREATER); // change the depth test because before, the light volumes were visible at all times
 
-		mat4 P = SetProjectionMatrix(volumesNoCullingProg); 
-		mat4 V = SetView(volumesNoCullingProg);
-		glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
-		glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
-		glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
-
+		// simplifies because we are only writing the normal data of the lights to the framebuffer
 		for (const Light& light : lights) {
-			glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
-			glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
-
-			SetModel(volumesNoCullingProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-			lightVolume->draw(volumesNoCullingProg); 
+			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+			//glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+			SetModel(norProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			lightVolume->draw(norProg);
 		}
-		volumesNoCullingProg->unbind();
-		glDisable(GL_BLEND);
-		
+		norProg->unbind();
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		// new shader to write to screen
-		screenProg->bind();
-		// bind to the screen
-		// Unbind previous textures??????????
-		//glActiveTexture(GL_TEXTURE0);
-		//glBindTexture(GL_TEXTURE_2D, 0);
-		/*glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, 0);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, 0);*/
+		//glCullFace(GL_BACK);  // Restore normal culling
+		//glDepthFunc(GL_LESS); // Restore default depth testing
 
-		// bind lightAccumulation texture and send uniforms to the screenShader
-		// the active texture and the second param of glUniform1i should be the same
-		glActiveTexture(GL_TEXTURE0); 
-		glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
-		glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
-		P = SetProjectionMatrix(screenProg);
-		V = SetView(screenProg); 
-
-		// draw quad with texture
-		glEnableVertexAttribArray(0);
-		glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		glDisableVertexAttribArray(0);
-		screenProg->unbind();
-
-		glDepthMask(GL_TRUE);
 
 		//code to write out the FBO (texture) just once -an example
 		if (FirstTime) {
-				assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
-				assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
-				assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
-				assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
-				assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
-				assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
-				FirstTime = false;
+			assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
+			assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
+			assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
+			assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+			assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
+			assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
+			FirstTime = false;
 		}
+		else {
+			// new shader to write to screen
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear everytime you bind to new framebuffer
+			volumesNoCullingProg->bind();
+				// current
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, gPosition);
+				glActiveTexture(GL_TEXTURE0 + 1);
+				glBindTexture(GL_TEXTURE_2D, gNormal);
+				glActiveTexture(GL_TEXTURE0 + 2);
+				glBindTexture(GL_TEXTURE_2D, gColorSpec);
+				// PREVIOUSLY NOOOOOOOOOOOOOOOOO I was binding this incorrectly when writing to the screen, but 
+				// correctly for the actual lighting computations.
+						// bind to the screen
+						// Unbind previous textures??????????
+						//glActiveTexture(GL_TEXTURE0);
+						//glBindTexture(GL_TEXTURE_2D, 0);
+						/*glActiveTexture(GL_TEXTURE1);
+						glBindTexture(GL_TEXTURE_2D, 0);
+						glActiveTexture(GL_TEXTURE2);
+						glBindTexture(GL_TEXTURE_2D, 0);*/
+				// combine the lighting calculations and writing to the screen
+				glActiveTexture(GL_TEXTURE0 + 3);
+				glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+
+				// PREVIOUSLY AND BASE CODE:
+				glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
+				glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
+				glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
+				// now sending the light buffer, LIGHTACCUMULATIONBUF
+				glUniform1i(volumesNoCullingProg->getUniform("lightBuf"), 3);
+
+				glEnableVertexAttribArray(0);
+				glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+				glDisableVertexAttribArray(0);
+			volumesNoCullingProg->unbind();
+
+		}
+
+
+
+
+
+		//// bind lightAccumulation texture and send uniforms to the screenShader
+		//// the active texture and the second param of glUniform1i should be the same
+		//glActiveTexture(GL_TEXTURE0); 
+		//glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+		//glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
+		//P = SetProjectionMatrix(screenProg);
+		//V = SetView(screenProg); 
+
+		//// draw quad with texture
+		//glEnableVertexAttribArray(0);
+		//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		//glDrawArrays(GL_TRIANGLES, 0, 6);
+		//glDisableVertexAttribArray(0);
+		//screenProg->unbind();
+
+		//glDepthMask(GL_TRUE);
+
+
+		//glClearColor(1, 0, 0, 1);
+		//glDepthMask(GL_FALSE);
+
+		//glEnable(GL_BLEND);
+		//glBlendFunc(GL_ONE, GL_ONE); 
+		//
+		//volumesNoCullingProg->bind();
+		//glActiveTexture(GL_TEXTURE0);
+		//glBindTexture(GL_TEXTURE_2D, gPosition);
+		//glActiveTexture(GL_TEXTURE1);
+		//glBindTexture(GL_TEXTURE_2D, gNormal);
+		//glActiveTexture(GL_TEXTURE2);
+		//glBindTexture(GL_TEXTURE_2D, gColorSpec);
+
+		//mat4 P = SetProjectionMatrix(volumesNoCullingProg); 
+		//mat4 V = SetView(volumesNoCullingProg);
+		//glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
+		//glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
+		//glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
+
+		//for (const Light& light : lights) {
+		//	glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+		//	glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+
+		//	SetModel(volumesNoCullingProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+		//	lightVolume->draw(volumesNoCullingProg); 
+		//}
+		//volumesNoCullingProg->unbind();
+		//glDisable(GL_BLEND);
+		//
+
+		//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		//// new shader to write to screen
+		//screenProg->bind();
+		//// bind to the screen
+		//// Unbind previous textures??????????
+		////glActiveTexture(GL_TEXTURE0);
+		////glBindTexture(GL_TEXTURE_2D, 0);
+		///*glActiveTexture(GL_TEXTURE1);
+		//glBindTexture(GL_TEXTURE_2D, 0);
+		//glActiveTexture(GL_TEXTURE2);
+		//glBindTexture(GL_TEXTURE_2D, 0);*/
+
+		//// bind lightAccumulation texture and send uniforms to the screenShader
+		//// the active texture and the second param of glUniform1i should be the same
+		//glActiveTexture(GL_TEXTURE0); 
+		//glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+		//glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
+		//P = SetProjectionMatrix(screenProg);
+		//V = SetView(screenProg); 
+
+		//// draw quad with texture
+		//glEnableVertexAttribArray(0);
+		//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+		//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+		//glDrawArrays(GL_TRIANGLES, 0, 6);
+		//glDisableVertexAttribArray(0);
+		//screenProg->unbind();
+
+		//glDepthMask(GL_TRUE);
+
+		////code to write out the FBO (texture) just once -an example
+		//if (FirstTime) {
+		//		assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
+		//		assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
+		//		assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
+		//		assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+		//		assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
+		//		assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
+		//		FirstTime = false;
+		//}
 	}
 	
 	/*void DrawQuad(GLuint inTex) {
@@ -691,9 +800,9 @@ public:
 		if (key == GLFW_KEY_Z && action == GLFW_RELEASE) {
 			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 		}
-		/*if (key == GLFW_KEY_P && action == GLFW_PRESS) {
-			DEFER = !DEFER;
-		}*/
+		if (key == GLFW_KEY_P && action == GLFW_PRESS) {
+			FirstTime = !FirstTime;
+		}
 		if (action == GLFW_RELEASE){
 			MOVER = MOVEF = MOVEB = MOVEL = false;
 		}
