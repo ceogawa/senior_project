@@ -18,8 +18,9 @@ void main() {
     vec3 Normal = texture(gNormal, texCoord).rgb;
     vec3 Albedo = texture(gColorSpec, texCoord).rgb;
     float Spec = texture(gColorSpec, texCoord).a;
+    vec4 lightMap = texture(lightMap, texCoord).rgba;
     // TODO added
-    vec3 lightV = vec3(-1.0) + 2.0*(texture(lightMap, texCoord).rgb);
+    vec3 lightV = vec3(-1.0) + 2.0*lightMap.rgb;
 
     vec3 lighting = Albedo * 0.01;
     vec3 lightDir = normalize(lightPos - FragPos);
@@ -34,6 +35,8 @@ void main() {
     lighting += diffuse;
     FragColor = vec4(lighting, 1.0);
 
+}
+
     // float gaussian[] = {0.0625, 0.125, 0.0625, 0.125, 0.25, 0.125, 0.0625, 0.125, 0.0625};
     // vec2 offset[] = {vec2(-1, 1), vec2(-1, 0), vec2(-1, -1), vec2(0, 1), vec2(0, 0), vec2(0, -1), vec2(1, 1), vec2(1, 0), vec2(1, -1)};
 
@@ -44,7 +47,3 @@ void main() {
 //         //blendedIntensity += (texture(lightMap, texCoord + (offset[i] * texSize * blur_radius))).r * gaussian[i];
 //    // }
 //     //vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo;
-
-
-
-} 

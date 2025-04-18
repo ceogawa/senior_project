@@ -154,27 +154,6 @@ public:
 		texProg->addAttribute("vertPos");
 		//texProg->addUniform("Ldir");
 
-
-		// deferred shader init
-		deferProg = make_shared<Program>();
-		deferProg->setVerbose(true);
-		deferProg->setShaderNames(
-			resourceDirectory + "/deferred_vert.glsl",
-			resourceDirectory + "/deferred_frag.glsl"
-		);
-		deferProg->init();
-		// add gbuffer uniforms to frag shader
-		deferProg->addUniform("gPosition");
-		deferProg->addUniform("gNormal");
-		deferProg->addUniform("gColorSpec");
-		// replace list of lights with lightmap
-		deferProg->addUniform("lightMap");
-		// cam
-		deferProg->addUniform("camPos");
-		// vertPos for shader. converts position to texcoord
-		deferProg->addAttribute("vertPos");
-
-
 		frontProg = make_shared<Program>();
 		frontProg->setVerbose(true);
 		frontProg->setShaderNames(
@@ -601,7 +580,7 @@ public:
 				// These are the pixels actually inside the light volume
 				glStencilFunc(GL_EQUAL, 0, 0xFF);
 
-			//	// 3. cull FRONT faces
+				// 3. cull FRONT faces
 				glCullFace(GL_FRONT);
 
 				backProg->bind();
@@ -632,11 +611,11 @@ public:
 				SetModel(backProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
 				lightVolume->draw(backProg);
 
-				// 	glEnableVertexAttribArray(0);
-				// 	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-				// 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-				// 	glDrawArrays(GL_TRIANGLES, 0, 6);
-				// 	glDisableVertexAttribArray(0);
+				// glEnableVertexAttribArray(0);
+				// glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+				// glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+				// glDrawArrays(GL_TRIANGLES, 0, 6);
+				// glDisableVertexAttribArray(0);
 
 				backProg->unbind(); 
 			} 
