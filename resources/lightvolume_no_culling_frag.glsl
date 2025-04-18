@@ -28,7 +28,6 @@ void main() {
     // reconstruct the lightNormals/lightDirection from the lightFBO. ***********************
     vec3 lightV = vec3(-1.0) + 2.0*(texture(lightBuf, texCoord).rgb);
 
-
     // vector from light center to scene fragment
     // vec3 lightDir = normalize(lightPos - FragPos);
 

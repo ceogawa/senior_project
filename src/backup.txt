@@ -1,0 +1,90 @@
+
+//// bind lightAccumulation texture and send uniforms to the screenShader
+//// the active texture and the second param of glUniform1i should be the same
+//glActiveTexture(GL_TEXTURE0); 
+//glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+//glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
+//P = SetProjectionMatrix(screenProg);
+//V = SetView(screenProg); 
+
+//// draw quad with texture
+//glEnableVertexAttribArray(0);
+//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+//glDrawArrays(GL_TRIANGLES, 0, 6);
+//glDisableVertexAttribArray(0);
+//screenProg->unbind();
+
+//glDepthMask(GL_TRUE);
+
+//glClearColor(1, 0, 0, 1);
+//glDepthMask(GL_FALSE);
+
+//glEnable(GL_BLEND);
+//glBlendFunc(GL_ONE, GL_ONE); 
+//
+//volumesNoCullingProg->bind();
+//glActiveTexture(GL_TEXTURE0);
+//glBindTexture(GL_TEXTURE_2D, gPosition);
+//glActiveTexture(GL_TEXTURE1);
+//glBindTexture(GL_TEXTURE_2D, gNormal);
+//glActiveTexture(GL_TEXTURE2);
+//glBindTexture(GL_TEXTURE_2D, gColorSpec);
+
+//mat4 P = SetProjectionMatrix(volumesNoCullingProg); 
+//mat4 V = SetView(volumesNoCullingProg);
+//glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
+//glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
+//glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
+
+//for (const Light& light : lights) {
+//	glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+//	glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+
+//	SetModel(volumesNoCullingProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+//	lightVolume->draw(volumesNoCullingProg); 
+//}
+//volumesNoCullingProg->unbind();
+//glDisable(GL_BLEND);
+//
+
+//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//// new shader to write to screen
+//screenProg->bind();
+//// bind to the screen
+//// Unbind previous textures??????????
+////glActiveTexture(GL_TEXTURE0);
+////glBindTexture(GL_TEXTURE_2D, 0);
+///*glActiveTexture(GL_TEXTURE1);
+//glBindTexture(GL_TEXTURE_2D, 0);
+//glActiveTexture(GL_TEXTURE2);
+//glBindTexture(GL_TEXTURE_2D, 0);*/
+
+//// bind lightAccumulation texture and send uniforms to the screenShader
+//// the active texture and the second param of glUniform1i should be the same
+//glActiveTexture(GL_TEXTURE0); 
+//glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+//glUniform1i(screenProg->getUniform("lightAccumulation"), 0);  // CHECK second param?
+//P = SetProjectionMatrix(screenProg);
+//V = SetView(screenProg); 
+
+//// draw quad with texture
+//glEnableVertexAttribArray(0);
+//glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+//glDrawArrays(GL_TRIANGLES, 0, 6);
+//glDisableVertexAttribArray(0);
+//screenProg->unbind();
+
+//glDepthMask(GL_TRUE);
+
+////code to write out the FBO (texture) just once -an example
+//if (FirstTime) {
+//		assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
+//		assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
+//		assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
+//		assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+//		assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
+//		assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
+//		FirstTime = false;
+//}

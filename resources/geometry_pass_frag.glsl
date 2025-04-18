@@ -12,7 +12,6 @@ uniform vec3 MatDif;
 void main()
 {
     // INITIALIZES THE GBUFFER WITH DATA
-
     // store the fragment position vector in the first gbuffer texture
    // gl_FragCoord.z 
    // TODO we want to store the z coordinate normalized based on the frustum.  
