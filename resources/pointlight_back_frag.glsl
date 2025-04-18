@@ -13,12 +13,15 @@ uniform vec3 lightPos;
 uniform vec3 lightCol;
 
 void main() {
+    // TE
+    // MAC window resolution
+    vec2 ftexCoord = vec2(gl_FragCoord.x/(2*960.0), gl_FragCoord.y/(2*720.0));
 
-    vec3 FragPos = texture(gPosition, texCoord).rgb;
-    vec3 Normal = texture(gNormal, texCoord).rgb;
-    vec3 Albedo = texture(gColorSpec, texCoord).rgb;
-    float Spec = texture(gColorSpec, texCoord).a;
-    vec4 lightMap = texture(lightMap, texCoord).rgba;
+    vec3 FragPos = texture(gPosition, ftexCoord).rgb;
+    vec3 Normal = texture(gNormal, ftexCoord).rgb;
+    vec3 Albedo = texture(gColorSpec, ftexCoord).rgb;
+    float Spec = texture(gColorSpec, ftexCoord).a;
+    vec4 lightMap = texture(lightMap, ftexCoord).rgba;
     // TODO added
     vec3 lightV = vec3(-1.0) + 2.0*lightMap.rgb;
 
@@ -27,13 +30,15 @@ void main() {
     float d = length(lightPos - FragPos);
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
-    vec3 diffuse = max(dot(normalize(lightV), normalize(Normal)), 0.0) + vec3(0.1); //* lightCol * Albedo;
+    vec3 diffuse = max(dot(normalize(lightV), normalize(Normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // if (d != 0){ 
     //     diffuse = diffuse/(float(d*d));
     // }
 
     lighting += diffuse;
     FragColor = vec4(lighting, 1.0);
+    //FragColor = vec4(ftexCoord, 0.0, 1.0);
+    //FragColor = vec4(Normal, 1.0);
 
     // TODO added TEMP debugging
    // FragColor = vec4(1.0, 0.2, 0.2, 1.0);

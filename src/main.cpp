@@ -623,6 +623,7 @@ public:
 
 
 			glDisable(GL_BLEND);
+			glDisable(GL_CULL_FACE);
 
 			// TODO removed
 

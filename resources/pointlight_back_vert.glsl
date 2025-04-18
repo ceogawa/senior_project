@@ -11,6 +11,8 @@ out vec2 texCoord;
 
 void main()
 {
+	// TODO CHANGEEEEEE
+	// check the texCood/glPosition
 	texCoord = (vertPos.xy+vec2(1, 1))/2.0;
 	gl_Position = P * V * M * vertPos;
 	//lightFragNor = (V* M * vec4(vertNor, 0.0)).xyz;
