@@ -383,7 +383,7 @@ public:
 		wall = initMesh("/objs/wall.obj", wall);
 		lamp = initMultiMesh("/objs/desk_lamp.obj", lamp);
 		// use sphere mesh to represent light volume
-		lightVolume = initMesh("/objs/sphere.obj", lightVolume);
+		lightVolume = initMesh("/objs/smoothSphere.obj", lightVolume);
 
 	}
 
@@ -517,7 +517,6 @@ public:
 		else {
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE);
-
 			// new shader to write to screen TODO do i render to the light buffer? 
 			//		or am i using the light buffer normals to sample the light direction?
 			// New stencil culling
@@ -549,7 +548,9 @@ public:
 				// we set this to always because we want every fragment 
 				// to pass the stencil test so we can check the DEPTH
 				glStencilFunc(GL_EQUAL, 0, 0xFF);
-				glDepthFunc(GL_GEQUAL); // TODO check this depth test
+				// TODO this test is GL_LEQUAL according to diagram
+				//https://cglearn.eu/pub/advanced-computer-graphics/deferred-rendering
+				glDepthFunc(GL_LEQUAL); // TODO check this depth test 
 				// 6. configure the stencil operations to keep frag
 				// for all front facing polygons:
 				//    if the stencil fails (it wont) then keep stencil value

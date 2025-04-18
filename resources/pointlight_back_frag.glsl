@@ -27,13 +27,17 @@ void main() {
     float d = length(lightPos - FragPos);
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
-    vec3 diffuse = max(dot(normalize(Normal), normalize(lightV)), 0.0) * lightCol * Albedo;
-    if (d != 0){ 
-        diffuse = diffuse/(float(d*d));
-    }
+    vec3 diffuse = max(dot(normalize(lightV), normalize(Normal)), 0.0) + vec3(0.1); //* lightCol * Albedo;
+    // if (d != 0){ 
+    //     diffuse = diffuse/(float(d*d));
+    // }
 
     lighting += diffuse;
     FragColor = vec4(lighting, 1.0);
+
+    // TODO added TEMP debugging
+   // FragColor = vec4(1.0, 0.2, 0.2, 1.0);
+    //FragColor = vec4(Albedo, 1.0);
 
 }
 
