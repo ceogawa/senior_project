@@ -19,6 +19,7 @@ void main()
     gPosition = fragPos;
     // also store the per-fragment normals into the gbuffer
     gNormal = normalize(fragNor);
+    //color = vec4(0.5f*(normal+vec3(1.0)), 1.0);
     // and the diffuse per-fragment color
     gAlbedoSpec.rgb = MatDif;
     

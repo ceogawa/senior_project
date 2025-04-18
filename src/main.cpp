@@ -342,6 +342,9 @@ public:
 
 	}
 
+	float niceRandom(){
+		return -1.0 + 2.0 * (float(rand()) / float(RAND_MAX));
+	}
 
 	void initLights() {
 
@@ -350,6 +353,9 @@ public:
 		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
+		for (int i = 0; i < 20; i++){
+			lights.push_back({vec3(i, niceRandom(), (i%2)+1), vec3(1.0f, 1.0f, 1.0f)});
+		}
 
 		// lights behind couch
 		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
@@ -490,8 +496,6 @@ public:
 		// Clear framebuffer.
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
  
-		float aspect = width/(float)height;
-
 		// GEOMETRY PASS (sets up gbuffer for scene)
 		drawGeometry();
 
@@ -512,7 +516,7 @@ public:
 		for (const Light& light : lights) {
 			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
 			//glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
-			SetModel(norProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+			SetModel(norProg, light.Position, 0.0f, 0.0f, 0.3f, 0.3f, 0.3f);
 			lightVolume->draw(norProg);
 		}
 		norProg->unbind();
