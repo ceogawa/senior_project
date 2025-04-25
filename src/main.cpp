@@ -185,6 +185,7 @@ public:
 		backProg->addUniform("P");
 		backProg->addUniform("V");
 		backProg->addUniform("M");
+		backProg->addUniform("resolution");
 		backProg->addAttribute("vertPos");
 
 		ambientProg = make_shared<Program>();
@@ -603,6 +604,8 @@ public:
 
 				glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
 				glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+				glUniform2f(backProg->getUniform("resolution"), width, height);
+				cout << "width: " << width << "height: " << height << endl;
 
 				P = SetProjectionMatrix(backProg);
 				V = SetView(backProg);
@@ -824,11 +827,17 @@ int main(int argc, char *argv[])
 	}
 
 	Application *application = new Application();
+	
+	// SCALE WINDOW
+	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
+	// glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
 
 	// Your main will always include a similar set up to establish your window
 	// and GL context, etc.
 
 	WindowManager *windowManager = new WindowManager();
+
 	windowManager->init(960, 720);
 	windowManager->setEventCallbacks(application);
 	application->windowManager = windowManager;

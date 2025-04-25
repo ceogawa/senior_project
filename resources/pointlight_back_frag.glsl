@@ -11,11 +11,13 @@ uniform sampler2D lightMap;
 
 uniform vec3 lightPos;
 uniform vec3 lightCol;
+uniform vec2 resolution;
 
 void main() {
     // TE
     // MAC window resolution
     vec2 ftexCoord = vec2(gl_FragCoord.x/(2*960.0), gl_FragCoord.y/(2*720.0));
+    // vec2 ftexCoord = vec2(gl_FragCoord.x/(2*resolution.x), gl_FragCoord.y/(2*resolution.y));
 
     vec3 FragPos = texture(gPosition, ftexCoord).rgb;
     vec3 Normal = texture(gNormal, ftexCoord).rgb;
@@ -37,7 +39,7 @@ void main() {
     // }
 
     lighting += diffuse;
-    FragColor = vec4(lighting, 1.0);
+    FragColor = vec4(Albedo, 1.0);
     //FragColor = vec4(ftexCoord, 0.0, 1.0);
     //FragColor = vec4(Normal, 1.0);
 
