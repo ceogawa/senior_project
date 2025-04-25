@@ -24,13 +24,14 @@ void main() {
     vec4 lightMap = texture(lightMap, ftexCoord).rgba;
     // TODO added
     vec3 lightV = vec3(-1.0) + 2.0*lightMap.rgb;
+    vec3 normal = vec3(-1.0) + 2.0*Normal.rgb;
 
     vec3 lighting = Albedo * 0.01;
     vec3 lightDir = normalize(lightPos - FragPos);
     float d = length(lightPos - FragPos);
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
-    vec3 diffuse = max(dot(normalize(lightV), normalize(Normal)), 0.0) * Albedo; //* lightCol * Albedo;
+    vec3 diffuse = max(dot(normalize(lightV), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // if (d != 0){ 
     //     diffuse = diffuse/(float(d*d));
     // }

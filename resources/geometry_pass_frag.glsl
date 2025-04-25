@@ -15,9 +15,12 @@ void main()
     // store the fragment position vector in the first gbuffer texture
    // gl_FragCoord.z 
    // TODO we want to store the z coordinate normalized based on the frustum.  
+   
     gPosition = fragPos;
     // also store the per-fragment normals into the gbuffer
-    gNormal = normalize(fragNor);
+    // *************is there a reason why normal for lights is vec4 TODO
+    gNormal = 0.5f * (normalize(fragNor) + vec3(1.0));
+    //gNormal = vec3(0.5f*(normal+vec3(1.0)));
     //color = vec4(0.5f*(normal+vec3(1.0)), 1.0);
     // and the diffuse per-fragment color
     gAlbedoSpec.rgb = MatDif;

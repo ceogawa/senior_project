@@ -503,7 +503,6 @@ public:
 		//glCullFace(GL_BACK);  // Restore normal culling
 		//glDepthFunc(GL_LESS); // Restore default depth testing
 
-
 		//code to write out the FBO (texture) just once -an example
 		if (FirstTime) {
 			assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
@@ -515,8 +514,6 @@ public:
 			FirstTime = false;
 		}
 		else {
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_ONE, GL_ONE);
 			// new shader to write to screen TODO do i render to the light buffer? 
 			//		or am i using the light buffer normals to sample the light direction?
 			// New stencil culling
@@ -583,7 +580,7 @@ public:
 
 				// 3. cull FRONT faces
 				glCullFace(GL_FRONT);
-
+				
 				backProg->bind();
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, gPosition); 
