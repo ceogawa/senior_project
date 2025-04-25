@@ -459,6 +459,8 @@ public:
 		SetMaterial(1);
 		wall->draw(prog);
 
+		//SetModel(prog, )
+
 		// ceiling??
 
 		// unbind after geometry pass
@@ -577,8 +579,20 @@ public:
 				// Set stencil function to only pass where stencil value equals 0
 				// This means we only light pixels that were "missed" by the front faces
 				// These are the pixels actually inside the light volume
+				// glStencilFuncSeparate(GL_FRONT, GL_ALWAYS, 1, 0xFF);  // Front faces always pass
+				// glStencilFuncSeparate(GL_BACK, GL_EQUAL, 0, 0xFF);    // Back faces pass when stencil = 0
 				glStencilFunc(GL_EQUAL, 0, 0xFF);
-
+				// ************************** perform depth check again??
+				// glDepthFunc(GL_GEQUAL); // TODO check this depth test 
+				// ************************** >>
+				// glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR, GL_KEEP);
+				// ***********************************************
+				// for all BACK facing polygons:
+				//    if the stencil fails (it wont) then keep stencil value
+				//    if the stencil passes but the depth fails, DISCARD stencil value (depth >= check ??)
+				//    if the stencil and the depth pass, KEEP
+				// TODO how to configure depth and stencil testing for back faces
+				glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR, GL_KEEP);   // Decrement when depth fails (back)
 				// 3. cull FRONT faces
 				glCullFace(GL_FRONT);
 				
