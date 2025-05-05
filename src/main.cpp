@@ -619,7 +619,7 @@ public:
 				glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
 				glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
 				glUniform2f(backProg->getUniform("resolution"), width, height);
-				cout << "width: " << width << "height: " << height << endl;
+				//cout << "width: " << width << "height: " << height << endl;
 
 				P = SetProjectionMatrix(backProg);
 				V = SetView(backProg);
