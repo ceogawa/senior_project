@@ -11,11 +11,13 @@ uniform sampler2D lightMap;
 
 uniform vec3 lightPos;
 uniform vec3 lightCol;
+uniform vec2 resolution;
 
 void main() {
     // TE
     // MAC window resolution
-    vec2 ftexCoord = vec2(gl_FragCoord.x/(2*960.0), gl_FragCoord.y/(2*720.0));
+    //vec2 ftexCoord = vec2(gl_FragCoord.x/(2*960.0), gl_FragCoord.y/(2*720.0));
+    vec2 ftexCoord = vec2(gl_FragCoord.x/(resolution.x), gl_FragCoord.y/(resolution.y));
 
     vec3 FragPos = texture(gPosition, ftexCoord).rgb;
     vec3 Normal = texture(gNormal, ftexCoord).rgb;
@@ -24,18 +26,20 @@ void main() {
     vec4 lightMap = texture(lightMap, ftexCoord).rgba;
     // TODO added
     vec3 lightV = vec3(-1.0) + 2.0*lightMap.rgb;
+    vec3 normal = vec3(-1.0) + 2.0*Normal.rgb;
 
     vec3 lighting = Albedo * 0.01;
     vec3 lightDir = normalize(lightPos - FragPos);
     float d = length(lightPos - FragPos);
+    float lightDirUP = dot(vec3(0.0, 1.0, 0.0), normal) * 0.01;
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
-    vec3 diffuse = max(dot(normalize(lightV), normalize(Normal)), 0.0) * Albedo; //* lightCol * Albedo;
+    vec3 diffuse = max(dot(normalize(lightV), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // if (d != 0){ 
     //     diffuse = diffuse/(float(d*d));
     // }
 
-    lighting += diffuse;
+    lighting += diffuse + (lightDirUP * Albedo);
     FragColor = vec4(lighting, 1.0);
     //FragColor = vec4(ftexCoord, 0.0, 1.0);
     //FragColor = vec4(Normal, 1.0);
