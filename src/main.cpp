@@ -88,6 +88,7 @@ public:
 	GLuint lightAccumulationBuf = 0;
 	GLuint lightAccumulationTexture = 0; 
 
+	// TODO not using light radius??
 	float light_radius = 0.3;
 
 
@@ -337,8 +338,8 @@ public:
 		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
-		for (int i = 0; i < 20; i++){
-			lights.push_back({vec3(i, niceRandom(), (i%2)+1), vec3(1.0f, 1.0f, 1.0f)});
+		for (int i = 0; i < 40; i++){
+			lights.push_back({vec3(i%10, niceRandom(), (i%2)+1), vec3(1.0f, 1.0f, 1.0f)});
 		}
 
 		// lights behind couch
@@ -390,7 +391,7 @@ public:
 
 	void cameraUpdate() {
       //camera movement - made continuous while keypressed
-      float speed = 0.1;
+      float speed = 0.05;
       if (MOVEL){
         g_eye -= speed*strafe;
         g_lookAt -= speed*strafe;
@@ -520,8 +521,18 @@ public:
 			// new shader to write to screen TODO do i render to the light buffer? 
 			//		or am i using the light buffer normals to sample the light direction?
 			// New stencil culling
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
+			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+			// from (0, 0) to (width, height)
+			glBlitFramebuffer(
+				0, 0, width, height, 
+				0, 0, width, height,
+				GL_DEPTH_BUFFER_BIT, GL_NEAREST
+			);
+
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
+			// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
+			glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
 
 			// 1. enable blending
 			glEnable(GL_BLEND);
@@ -594,7 +605,8 @@ public:
 				// TODO how to configure depth and stencil testing for back faces
 
 				// UPDATE third paarm
-				glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);   // Decrement when depth fails (back)
+				//glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);   // Decrement when depth fails (back)
+				glStencilOpSeparate(GL_BACK, GL_KEEP, GL_DECR, GL_KEEP);   // Decrement when depth fails (back)
 				// 3. cull FRONT faces
 				glCullFace(GL_FRONT);
 				
@@ -862,8 +874,8 @@ public:
 	void scrollCallback(GLFWwindow* window, double deltaX, double deltaY) {
 		vec3 diff, newV;
 
-		g_theta += deltaX*0.25;
-		g_phi += deltaY*0.25;
+		g_theta += deltaX*0.2;
+		g_phi += deltaY*0.2;
 		newV.x = cosf(g_phi)*cosf(g_theta);
 		newV.y = -1.0*sinf(g_phi);
 		newV.z = 1.0*cosf(g_phi)*cosf((3.14/2.0-g_theta));
