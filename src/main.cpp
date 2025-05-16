@@ -547,7 +547,7 @@ public:
 			glEnable(GL_CULL_FACE);
 		
 			for (const Light& light : lights) {
-				//glEnable(GL_DEPTH_TEST);
+				glEnable(GL_DEPTH_TEST);
 			    // FRONT PASS
 				// 1. disable writing to the color buffer for the first pass
 				glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
@@ -577,6 +577,7 @@ public:
 
 				P = SetProjectionMatrix(frontProg);
 				V = SetView(frontProg);
+				
 				SetModel(frontProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
 				// 10. DRAW light volumes
 				lightVolume->draw(frontProg);
@@ -592,7 +593,13 @@ public:
 				// These are the pixels actually inside the light volume
 				// glStencilFuncSeparate(GL_FRONT, GL_ALWAYS, 1, 0xFF);  // Front faces always pass
 				// glStencilFuncSeparate(GL_BACK, GL_EQUAL, 0, 0xFF);    // Back faces pass when stencil = 0
-				glStencilFunc(GL_EQUAL, 0, 0xFF);
+				
+				// check where 1 is written to the stencil buffer
+				glStencilFunc(GL_EQUAL, 1, 0xFF);
+    
+				// do not have to write to the stencil, only read and chek against it
+				glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
 				// ************************** perform depth check again??
 				// glDepthFunc(GL_GEQUAL); // TODO check this depth test 
 				// ************************** >>
@@ -605,8 +612,8 @@ public:
 				// TODO how to configure depth and stencil testing for back faces
 
 				// UPDATE third paarm
-				//glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);   // Decrement when depth fails (back)
-				glStencilOpSeparate(GL_BACK, GL_KEEP, GL_DECR, GL_KEEP);   // Decrement when depth fails (back)
+				// glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);   
+				// glStencilOpSeparate(GL_BACK, GL_KEEP, GL_KEEP, GL_KEEP);   // Decrement when depth fails (back)
 				// 3. cull FRONT faces
 				glCullFace(GL_FRONT);
 				
@@ -634,7 +641,7 @@ public:
 
 				P = SetProjectionMatrix(backProg);
 				V = SetView(backProg);
-				SetModel(backProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
+				SetModel(backProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
 				lightVolume->draw(backProg);
 				backProg->unbind(); 
 			} 
@@ -648,149 +655,6 @@ public:
 			glDepthFunc(GL_LESS);
 			glStencilFunc(GL_ALWAYS, 0, 0xFF);
 			glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-
-
-			// for (const Light& light : lights) {
-			// 	//glEnable(GL_DEPTH_TEST);
-			//     // FRONT PASS
-			// 	// 1. disable writing to the color buffer for the first pass
-			// 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-			// 	// 2. disable writing to the depth buffer for the first pass
-			// 	glDepthMask(GL_FALSE);
-			// 	// 4. init the stencil buffer to 0
-			// 	glClear(GL_STENCIL_BUFFER_BIT);
-			// 	// 5. func = always, ref = 0, mask = 0xFF
-			// 	// we set this to always because we want every fragment 
-			// 	// to pass the stencil test so we can check the DEPTH
-			// 	glStencilFunc(GL_EQUAL, 0, 0xFF);
-			// 	// TODO this test is GL_LEQUAL according to diagram
-			// 	//https://cglearn.eu/pub/advanced-computer-graphics/deferred-rendering
-			// 	glDepthFunc(GL_LEQUAL); // TODO check this depth test 
-			// 	// 6. configure the stencil operations to keep frag
-			// 	// for all front facing polygons:
-			// 	//    if the stencil fails (it wont) then keep stencil value
-			// 	//    if the stencil passes but the depth fails, keep the stencil value
-			// 	//    if the stencil and the depth pass, increment (discard)
-			// 	glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR);
-
-			// 	// 8. cull back faces
-			// 	glCullFace(GL_BACK);
-
-			// 	// 9. bind, send uniforms, draw
-			// 	frontProg->bind();
-
-			// 	P = SetProjectionMatrix(frontProg);
-			// 	V = SetView(frontProg);
-			// 	SetModel(frontProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
-			// 	// 10. DRAW light volumes
-			// 	lightVolume->draw(frontProg);
-
-			// 	frontProg->unbind();
-
-			// 	// BACK PASS
-			// 	// 1. reenable color buffer
-			// 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-			// 	// 2. change stencil func
-			// 	// Set stencil function to only pass where stencil value equals 0
-			// 	// This means we only light pixels that were "missed" by the front faces
-			// 	// These are the pixels actually inside the light volume
-			// 	// glStencilFuncSeparate(GL_FRONT, GL_ALWAYS, 1, 0xFF);  // Front faces always pass
-			// 	// glStencilFuncSeparate(GL_BACK, GL_EQUAL, 0, 0xFF);    // Back faces pass when stencil = 0
-			// 	glStencilFunc(GL_EQUAL, 0, 0xFF);
-			// 	// ************************** perform depth check again??
-			// 	// glDepthFunc(GL_GEQUAL); // TODO check this depth test 
-			// 	// ************************** >>
-			// 	// glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR, GL_KEEP);
-			// 	// ***********************************************
-			// 	// for all BACK facing polygons:
-			// 	//    if the stencil fails (it wont) then keep stencil value
-			// 	//    if the stencil passes but the depth fails, DISCARD stencil value (depth >= check ??)
-			// 	//    if the stencil and the depth pass, KEEP
-			// 	// TODO how to configure depth and stencil testing for back faces
-			// 	glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR, GL_KEEP);   // Decrement when depth fails (back)
-			// 	// 3. cull FRONT faces
-			// 	glCullFace(GL_FRONT);
-				
-			// 	backProg->bind();
-			// 	glActiveTexture(GL_TEXTURE0);
-			// 	glBindTexture(GL_TEXTURE_2D, gPosition); 
-			// 	glActiveTexture(GL_TEXTURE1); 
-			// 	glBindTexture(GL_TEXTURE_2D, gNormal); 
-			// 	glActiveTexture(GL_TEXTURE2); 
-			// 	glBindTexture(GL_TEXTURE_2D, gColorSpec); 
-
-			// 	// TODO added
-			// 	glActiveTexture(GL_TEXTURE3); 
-			// 	glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture); 
-
-			// 	// GLint loc = backProg->getUniform("gPosition");
-			// 	// if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
-			// 	glUniform1i(backProg->getUniform("gPosition"), 0);
-			// 	glUniform1i(backProg->getUniform("gNormal"), 1);
-			// 	glUniform1i(backProg->getUniform("gColorSpec"), 2);
-			// 	// TODO added
-			// 	glUniform1i(backProg->getUniform("lightMap"), 3);
-
-			// 	glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
-			// 	glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
-			// 	glUniform2f(backProg->getUniform("resolution"), width, height);
-			// 	//cout << "width: " << width << "height: " << height << endl;
-
-			// 	P = SetProjectionMatrix(backProg);
-			// 	V = SetView(backProg);
-			// 	SetModel(backProg, light.Position, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
-			// 	lightVolume->draw(backProg);
-
-			// 	// glEnableVertexAttribArray(0);
-			// 	// glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-			// 	// glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-			// 	// glDrawArrays(GL_TRIANGLES, 0, 6);
-			// 	// glDisableVertexAttribArray(0);
-
-			// 	backProg->unbind(); 
-			// } 
-
-
-			// glDisable(GL_BLEND);
-			// glDisable(GL_CULL_FACE);
-
-			// TODO removed
-
-			// volumesNoCullingProg->bind();
-			// 	// current
-			// 	glActiveTexture(GL_TEXTURE0);
-			// 	glBindTexture(GL_TEXTURE_2D, gPosition);
-			// 	glActiveTexture(GL_TEXTURE0 + 1);
-			// 	glBindTexture(GL_TEXTURE_2D, gNormal);
-			// 	glActiveTexture(GL_TEXTURE0 + 2);
-			// 	glBindTexture(GL_TEXTURE_2D, gColorSpec);
-			// 	// PREVIOUSLY NOOOOOOOOOOOOOOOOO I was binding this incorrectly when writing to the screen, but 
-			// 	// correctly for the actual lighting computations.
-			// 			// bind to the screen
-			// 			// Unbind previous textures??????????
-			// 			//glActiveTexture(GL_TEXTURE0);
-			// 			//glBindTexture(GL_TEXTURE_2D, 0);
-			// 			/*glActiveTexture(GL_TEXTURE1);
-			// 			glBindTexture(GL_TEXTURE_2D, 0);
-			// 			glActiveTexture(GL_TEXTURE2);
-			// 			glBindTexture(GL_TEXTURE_2D, 0);*/
-			// 	// combine the lighting calculations and writing to the screen
-			// 	glActiveTexture(GL_TEXTURE0 + 3);
-			// 	glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
-
-			// 	// PREVIOUSLY AND BASE CODE:
-			// 	glUniform1i(volumesNoCullingProg->getUniform("gPosition"), 0);
-			// 	glUniform1i(volumesNoCullingProg->getUniform("gNormal"), 1);
-			// 	glUniform1i(volumesNoCullingProg->getUniform("gColorSpec"), 2); 
-			// 	// now sending the light buffer, LIGHTACCUMULATIONBUF
-			// 	glUniform1i(volumesNoCullingProg->getUniform("lightBuf"), 3);
-
-			// 	glEnableVertexAttribArray(0);
-			// 	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-			// 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-			// 	glDrawArrays(GL_TRIANGLES, 0, 6);
-			// 	glDisableVertexAttribArray(0);
-			// volumesNoCullingProg->unbind();
 
 		}
 

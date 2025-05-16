@@ -30,44 +30,38 @@ void main() {
     vec3 normal = vec3(-1.0) + 2.0*Normal.rgb;
 
     vec3 lighting = Albedo * 0.01;
-    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 lightDir = normalize(lightPos - FragPos);  // TODO: currently subtracting world space position - texture space gbuffer position?
     float d = length(lightPos - FragPos);
     float lightDirUP = dot(vec3(0.0, 1.0, 0.0), normal) * 0.01;
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
-    vec3 diffuse;
-    if(d <= lightRadius){
-        diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * d/float(lightRadius);
-        diffuse = vec3(1.0);
-    }
-    else{
-        diffuse = Albedo * 0.1;
-    }
-    //vec3 diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
+
+    // vec3 diffuse;
+    // if(d <= lightRadius){
+    //     diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * d/float(lightRadius);
+    //     diffuse = vec3(1.0);
+    // }
+    // else{
+    //     diffuse = Albedo * 0.1;
+    //     // diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * d/float(lightRadius);
+    // }
+
+    // no longer using light normals to calculate light direction
+    vec3 diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // if (d > lightRadius){ 
-    //     //discard;
-    //     // diffuse = diffuse/(float(d*d));
-    //     //diffuse = diffuse/
+    //     // discard;
+    //     diffuse = diffuse/(float(d*d));
+    // //     //diffuse = diffuse/
     // }
     // float d = length(lightDir);
     lighting += diffuse; //+ (lightDirUP * Albedo);
+    // visualize distance (larger than light volume radius)
+    // lighting = vec3(d*0.5);
     FragColor = vec4(lighting, 1.0);
+
+    // added TEMP debugging
     //FragColor = vec4(ftexCoord, 0.0, 1.0);
     //FragColor = vec4(Normal, 1.0);
-
-    // TODO added TEMP debugging
-   // FragColor = vec4(1.0, 0.2, 0.2, 1.0);
     //FragColor = vec4(Albedo, 1.0);
 
 }
-
-    // float gaussian[] = {0.0625, 0.125, 0.0625, 0.125, 0.25, 0.125, 0.0625, 0.125, 0.0625};
-    // vec2 offset[] = {vec2(-1, 1), vec2(-1, 0), vec2(-1, -1), vec2(0, 1), vec2(0, 0), vec2(0, -1), vec2(1, 1), vec2(1, 0), vec2(1, -1)};
-
-//     float blur_radius = 6.0f;
-//     float blendedIntensity = 0.0f; 
-
-//    // for(int i = 0; i < 9; i++){
-//         //blendedIntensity += (texture(lightMap, texCoord + (offset[i] * texSize * blur_radius))).r * gaussian[i];
-//    // }
-//     //vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo;
