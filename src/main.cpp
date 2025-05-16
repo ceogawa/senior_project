@@ -89,7 +89,7 @@ public:
 	GLuint lightAccumulationTexture = 0; 
 
 	// TODO not using light radius??
-	float light_radius = 0.3;
+	float light_radius = 0.5;
 
 
 	bool FirstTime = true;
@@ -338,15 +338,16 @@ public:
 		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
-		for (int i = 0; i < 40; i++){
-			lights.push_back({vec3(i%10, niceRandom(), (i%2)+1), vec3(1.0f, 1.0f, 1.0f)});
+		for (int i = 0; i < 400; i++){
+			lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
 		}
 
 		// lights behind couch
 		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
-			lights.push_back({glm::vec3(x, 0.1f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
+			lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
 		}
 	}
+
 
 	void createFBO(GLuint& fb, GLuint& tex) {
 		//initialize FBO

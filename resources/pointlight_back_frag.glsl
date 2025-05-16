@@ -13,7 +13,7 @@ uniform vec3 lightPos;
 uniform vec3 lightCol;
 uniform vec2 resolution;
 
-float lightRadius = 0.3;
+float lightRadius = 0.5;
 
 void main() {
     // MAC window resolution
@@ -50,7 +50,8 @@ void main() {
     vec3 diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // if (d > lightRadius){ 
     //     // discard;
-    //     diffuse = diffuse/(float(d*d));
+    //     // diffuse = diffuse/(float(d*d)-0.2);
+    //     // diffuse = vec3(1.0f, 0.5f, 0.5f);
     // //     //diffuse = diffuse/
     // }
     // float d = length(lightDir);
