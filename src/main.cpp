@@ -566,8 +566,9 @@ public:
 				// for all front facing polygons:
 				//    if the stencil fails (it wont) then keep stencil value
 				//    if the stencil passes but the depth fails, keep the stencil value
-				//    if the stencil and the depth pass, increment 
-				glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_KEEP, GL_INCR);
+				//    if the stencil and the depth pass, increment (discard)
+				//	  if everything passes, KEEP
+				glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR, GL_KEEP);
 
 				// 8. cull back faces
 				glCullFace(GL_BACK);
@@ -588,10 +589,9 @@ public:
 				// 1. reenable color buffer
 				glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 				// 2. change stencil func
-				// Set stencil function to only pass where stencil value equals 1
-	
-				// check where 1 is written to the stencil buffer
-				glStencilFunc(GL_EQUAL, 1, 0xFF);
+				// check where 0 is written to the stencil buffer
+				// (can flip stencil op if not working peroperly)
+				glStencilFunc(GL_EQUAL, 0, 0xFF);
     
 				// do not have to write to the stencil, only read and chek against it
 				glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
