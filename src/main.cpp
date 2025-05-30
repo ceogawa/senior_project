@@ -89,7 +89,7 @@ public:
 	GLuint lightAccumulationTexture = 0; 
 
 	// TODO not using light radius??
-	float light_radius = 0.5;
+	float light_radius = 0.09;
 
 
 	bool FirstTime = true;
@@ -338,7 +338,7 @@ public:
 		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
 		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
-		for (int i = 0; i < 400; i++){
+		for (int i = 0; i < 1000; i++){
 			lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
 		}
 
@@ -519,9 +519,8 @@ public:
 			FirstTime = false;
 		}
 		else {
-			// new shader to write to screen TODO do i render to the light buffer? 
-			//		or am i using the light buffer normals to sample the light direction?
-			// New stencil culling
+
+			// read from gBuffer
 			glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 			// from (0, 0) to (width, height)
@@ -531,6 +530,20 @@ public:
 				GL_DEPTH_BUFFER_BIT, GL_NEAREST
 			);
 
+			// ambientProg->bind();
+			// glActiveTexture(GL_TEXTURE0);
+			// glBindTexture(GL_TEXTURE_2D, gColorSpec); 
+			// P = SetProjectionMatrix(ambientProg);
+			// V = SetView(ambientProg);
+			// glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+
+			// glEnableVertexAttribArray(0);
+			// glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+			// glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+			// glDrawArrays(GL_TRIANGLES, 0, 6);
+			// glDisableVertexAttribArray(0);
+			// ambientProg->unbind();
+			
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
 			glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
@@ -634,6 +647,9 @@ public:
 				lightVolume->draw(backProg);
 				backProg->unbind(); 
 			} 
+
+			// glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			// glClear(GL_COLOR_BUFFER_BIT); 
 
 			// RESTORE ALLLL previous opengl settings
 			glDisable(GL_BLEND);

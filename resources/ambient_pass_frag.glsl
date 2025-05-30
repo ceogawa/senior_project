@@ -4,7 +4,6 @@ in vec2 texCoord;
 
 uniform sampler2D gColorSpec;
 
-
 void main() {
 
     float intensity = 10.0;
@@ -12,5 +11,6 @@ void main() {
     float Spec = texture(gColorSpec, texCoord).a;
     vec3 lighting = Albedo * intensity;
 
-    FragColor = vec4(lighting, 1.0);
+    FragColor = vec4(1.0);
+
 } 
