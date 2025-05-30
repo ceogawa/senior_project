@@ -198,6 +198,8 @@ public:
 		ambientProg->init();
 		ambientProg->addAttribute("vertPos"); 
 		ambientProg->addUniform("gColorSpec");
+		// ambientProg->addUniform("gNormal");
+		// ambientProg->addUniform("lightDir");
 
 		// Light Volumes Deferred Render Pass, No Stencil Culling
 		volumesNoCullingProg = make_shared<Program>();
@@ -734,8 +736,14 @@ public:
 			ambientProg->bind();
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, gColorSpec); 
-				glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, gNormal); 
 
+				glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+				// glUniform1i(ambientProg->getUniform("gNormal"), 1);
+				// glUniform3f(ambientProg->getUniform("lightDir"), 1, -1, 0);
+
+				// draw quad
 				glEnableVertexAttribArray(0);
 				glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
 				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
