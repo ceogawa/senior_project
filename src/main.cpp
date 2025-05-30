@@ -196,9 +196,6 @@ public:
 			resourceDirectory + "/ambient_pass_frag.glsl"
 		);
 		ambientProg->init();
-		ambientProg->addUniform("P");
-		ambientProg->addUniform("V");
-		ambientProg->addUniform("M");
 		ambientProg->addAttribute("vertPos"); 
 		ambientProg->addUniform("gColorSpec");
 
@@ -470,6 +467,199 @@ public:
 
 	}
 
+	// void render(float frametime) {
+	// 	// Get current frame buffer size.
+	// 	int width, height;
+	// 	glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
+	// 	glViewport(0, 0, width, height);
+
+	// 	 //camera movement - made continuous while keypressed
+	// 	cameraUpdate();
+
+    //     // bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
+	// 	glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+	// 	// Clear framebuffer.
+	// 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+ 
+	// 	// GEOMETRY PASS (sets up gbuffer for scene)
+	// 	drawGeometry();
+
+	// 	// PREVIOUSLY AND BASE CODE
+	// 	// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
+	// 	glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
+	// 	// clear the color buffer before all light computations
+	// 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+	// 	norProg->bind();
+	// 	mat4 P = SetProjectionMatrix(norProg); 
+	// 	mat4 V = SetView(norProg);
+
+	// 	// simplifies because we are only writing the normal data of the lights to the framebuffer
+	// 	for (const Light& light : lights) {
+	// 		//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+	// 		//glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+	// 		SetModel(norProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+	// 		lightVolume->draw(norProg);
+	// 	}
+	// 	norProg->unbind();
+
+	// 	//glCullFace(GL_BACK);  // Restore normal culling
+	// 	//glDepthFunc(GL_LESS); // Restore default depth testing
+
+	// 	//code to write out the FBO (texture) just once -an example
+	// 	if (FirstTime) {
+	// 		assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
+	// 		assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
+	// 		assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
+	// 		assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+	// 		assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
+	// 		assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
+	// 		FirstTime = false;
+	// 	}
+	// 	else {
+
+	// 		// read from gBuffer
+	// 		glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
+	// 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+	// 		// from (0, 0) to (width, height)
+	// 		glBlitFramebuffer(
+	// 			0, 0, width, height, 
+	// 			0, 0, width, height,
+	// 			GL_DEPTH_BUFFER_BIT, GL_NEAREST
+	// 		);
+			
+	// 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// 		// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
+	// 		glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
+
+	// 		// ambientProg->bind();
+	// 		// 	glActiveTexture(GL_TEXTURE0);
+	// 		// 	glBindTexture(GL_TEXTURE_2D, gColorSpec); 
+	// 		// 	glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+
+	// 		// 	glEnableVertexAttribArray(0);
+	// 		// 	glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+	// 		// 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+	// 		// 	glDrawArrays(GL_TRIANGLES, 0, 6);
+	// 		// 	glDisableVertexAttribArray(0);
+	// 		// ambientProg->unbind();
+
+	// 		// 1. enable blending
+	// 		glEnable(GL_BLEND);
+	// 		// 2. setup ADDITIVE blending
+	// 		glBlendFunc(GL_ONE, GL_ONE);
+	// 		// 3. enable stencil testing 
+	// 		// conditionally eliminates pixels based on comparison test
+	// 		glEnable(GL_STENCIL_TEST);
+	// 		// TODO check
+	// 		// // 7. enable face culling to only view front faces
+	// 		glEnable(GL_CULL_FACE);
+		
+	// 		for (const Light& light : lights) {
+	// 			glEnable(GL_DEPTH_TEST);
+	// 		    // FRONT PASS
+	// 			// 1. disable writing to the color buffer for the first pass
+	// 			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	// 			// 2. disable writing to the depth buffer for the first pass
+	// 			glDepthMask(GL_FALSE);
+	// 			// 4. init the stencil buffer to 0
+	// 			glClear(GL_STENCIL_BUFFER_BIT);
+	// 			// 5. func = always, ref = 0, mask = 0xFF
+	// 			// we set this to always because we want every fragment 
+	// 			// to pass the stencil test so we can check the DEPTH
+	// 			glStencilFunc(GL_ALWAYS, 0, 0xFF);
+	// 			// TODO this test is GL_LEQUAL according to diagram
+	// 			//https://cglearn.eu/pub/advanced-computer-graphics/deferred-rendering
+	// 			glDepthFunc(GL_LEQUAL); // TODO check this depth test 
+	// 			// 6. configure the stencil operations to keep frag
+	// 			// for all front facing polygons:
+	// 			//    if the stencil fails (it wont) then keep stencil value
+	// 			//    if the stencil passes but the depth fails, keep the stencil value
+	// 			//    if the stencil and the depth pass, increment (discard)
+	// 			//	  if everything passes, KEEP
+	// 			glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_INCR, GL_KEEP);
+
+	// 			// 8. cull back faces
+	// 			glCullFace(GL_BACK);
+
+	// 			// 9. bind, send uniforms, draw
+	// 			frontProg->bind();
+
+	// 			P = SetProjectionMatrix(frontProg);
+	// 			V = SetView(frontProg);
+				
+	// 			SetModel(frontProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+	// 			// 10. DRAW light volumes
+	// 			lightVolume->draw(frontProg);
+
+	// 			frontProg->unbind();
+
+	// 			// BACK PASS
+	// 			// 1. reenable color buffer
+	// 			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	// 			// 2. change stencil func
+	// 			// check where 0 is written to the stencil buffer
+	// 			// (can flip stencil op if not working peroperly)
+	// 			glStencilFunc(GL_EQUAL, 0, 0xFF);
+    
+	// 			// do not have to write to the stencil, only read and chek against it
+	// 			glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	// 			// for all BACK facing polygons:
+	// 			//    if the stencil fails (it wont) then keep stencil value
+	// 			//    if the stencil passes but the depth fails, DISCARD stencil value (depth >= check ??)
+	// 			//    if the stencil and the depth pass, KEEP
+	// 			// TODO how to configure depth and stencil testing for back faces
+
+	// 			// cull FRONT faces
+	// 			glCullFace(GL_FRONT);
+				
+	// 			backProg->bind();
+	// 			glActiveTexture(GL_TEXTURE0);
+	// 			glBindTexture(GL_TEXTURE_2D, gPosition); 
+	// 			glActiveTexture(GL_TEXTURE1); 
+	// 			glBindTexture(GL_TEXTURE_2D, gNormal); 
+	// 			glActiveTexture(GL_TEXTURE2); 
+	// 			glBindTexture(GL_TEXTURE_2D, gColorSpec); 
+	// 			glActiveTexture(GL_TEXTURE3); 
+	// 			glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture); 
+
+	// 			// GLint loc = backProg->getUniform("gPosition");
+	// 			// if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
+	// 			glUniform1i(backProg->getUniform("gPosition"), 0);
+	// 			glUniform1i(backProg->getUniform("gNormal"), 1);
+	// 			glUniform1i(backProg->getUniform("gColorSpec"), 2);
+	// 			glUniform1i(backProg->getUniform("lightMap"), 3);
+
+	// 			glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+	// 			glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+	// 			glUniform2f(backProg->getUniform("resolution"), width, height);
+	// 			//cout << "width: " << width << "height: " << height << endl;
+
+	// 			P = SetProjectionMatrix(backProg);
+	// 			V = SetView(backProg);
+	// 			SetModel(backProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+	// 			lightVolume->draw(backProg);
+	// 			backProg->unbind(); 
+	// 		} 
+
+	// 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// 		glClear(GL_COLOR_BUFFER_BIT); 
+
+	// 		// RESTORE ALLLL previous opengl settings
+	// 		glDisable(GL_BLEND);
+	// 		glDisable(GL_STENCIL_TEST);
+	// 		glDisable(GL_CULL_FACE);
+	// 		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	// 		glDepthMask(GL_TRUE);
+	// 		glDepthFunc(GL_LESS);
+	// 		glStencilFunc(GL_ALWAYS, 0, 0xFF);
+	// 		glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
+	// 	}
+
+
+	// }
+	 
 	void render(float frametime) {
 		// Get current frame buffer size.
 		int width, height;
@@ -530,20 +720,6 @@ public:
 				GL_DEPTH_BUFFER_BIT, GL_NEAREST
 			);
 
-			// ambientProg->bind();
-			// glActiveTexture(GL_TEXTURE0);
-			// glBindTexture(GL_TEXTURE_2D, gColorSpec); 
-			// P = SetProjectionMatrix(ambientProg);
-			// V = SetView(ambientProg);
-			// glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
-
-			// glEnableVertexAttribArray(0);
-			// glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-			// glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-			// glDrawArrays(GL_TRIANGLES, 0, 6);
-			// glDisableVertexAttribArray(0);
-			// ambientProg->unbind();
-			
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
 			glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
@@ -552,6 +728,21 @@ public:
 			glEnable(GL_BLEND);
 			// 2. setup ADDITIVE blending
 			glBlendFunc(GL_ONE, GL_ONE);
+
+			// WRITE AMBIENT CONTRIBUTION TO CORRESPONDING DEPTH
+			glDepthMask(GL_FALSE);
+			ambientProg->bind();
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, gColorSpec); 
+				glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+
+				glEnableVertexAttribArray(0);
+				glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
+				glDrawArrays(GL_TRIANGLES, 0, 6);
+				glDisableVertexAttribArray(0);
+
+			ambientProg->unbind();
 
 			// 3. enable stencil testing 
 			// conditionally eliminates pixels based on comparison test
@@ -566,7 +757,7 @@ public:
 				// 1. disable writing to the color buffer for the first pass
 				glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 				// 2. disable writing to the depth buffer for the first pass
-				glDepthMask(GL_FALSE);
+				// glDepthMask(GL_FALSE);
 				// 4. init the stencil buffer to 0
 				glClear(GL_STENCIL_BUFFER_BIT);
 				// 5. func = always, ref = 0, mask = 0xFF
@@ -665,7 +856,6 @@ public:
 
 
 	}
-	 
 	/* helper functions for sending matrix data to the GPU */
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
 		int width, height;
