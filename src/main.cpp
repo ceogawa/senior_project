@@ -80,6 +80,7 @@ public:
 	GLuint gPosition = 0;
 	GLuint gNormal = 0;
 	GLuint gColorSpec = 0;
+	GLuint gDepth = 0;
 	GLuint depthBuf = 0;
 	GLuint lightDepthBuf = 0; 
 	GLuint lightPositions = 0;
@@ -90,7 +91,6 @@ public:
 
 	// TODO not using light radius??
 	float light_radius = 0.09;
-
 
 	bool FirstTime = true;
 	bool DEFER = true;
@@ -142,7 +142,6 @@ public:
 		//		vec3 fragPos;
 		//		vec3 fragNor; 
 		// to the geometry frag shader
-		
 
 		// TODO texprog? modify to pass color to defer
 		texProg = make_shared<Program>();
@@ -263,15 +262,15 @@ public:
 		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1, 0);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0); 
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0);
+		// - depth buffer
+		createBuffer(&gDepth, width, height, GL_COLOR_ATTACHMENT3, 0); 
+		
 
 		GLenum check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
 			std::cerr << "ERROR: GBUFFER is not complete! " << check << std::endl;
 		}
-		// Just reuse gDepthBuf
-
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 		glGenRenderbuffers(1, &depthBuf);
@@ -284,9 +283,8 @@ public:
 			std::cout << "Framebuffer not complete!" << std::endl;
 
 		//more FBO set up
-		GLenum DrawBuffers[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-		glDrawBuffers(3, DrawBuffers);
-
+		GLenum DrawBuffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+		glDrawBuffers(4, DrawBuffers);
 
 		///////////////////////////////////////////////////////////////////////////////////////////////
         // generate the light accumulation buffer
@@ -294,17 +292,6 @@ public:
 		glGenTextures(1, &lightAccumulationTexture);
 		// do I call gen again?
 		glGenRenderbuffers(1, &depthBuf);
-
-		// PREVIOUSLY
-		// bind to buffer
-		//glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);k
-		//createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT0, 0); 
-				//glGenTextures(1, buffer);
-				//glBindTexture(GL_TEXTURE_2D, *buffer);
-				//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-				//glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, level);
 
 		// BASE CODE
 		createFBO(lightAccumulationBuf, lightAccumulationTexture);
@@ -314,14 +301,11 @@ public:
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
 
-
 		GLenum DrawBuffer[1] = { GL_COLOR_ATTACHMENT0 };
 		glDrawBuffers(1, DrawBuffer);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		// DO I NEED THIS?
-		//createFBO(LframeBuf[1], LtexBuf[1]); ??
-
+		
 		initLights();
 
 	}
@@ -513,6 +497,7 @@ public:
 			assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 			assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 			assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+			assert(GLTextureWriter::WriteImage(gDepth, "gDepth.png"));
 			assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
 			assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
 			FirstTime = false;
