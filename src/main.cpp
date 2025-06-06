@@ -452,6 +452,83 @@ public:
 		prog->unbind();
 
 	}
+
+	void computeEdges(){
+
+		// define sobel kernels
+		int sobelX[3][3] = {{-1, 0, 1}, 
+							{-2, 0, 2}, 
+							{-1, 0, 1}};
+
+		int sobelY[3][3] = {{-1, -2, -1}, 
+							{0, 0, 0}, 
+							{1, 2, 1}};
+
+		// read in gDepth texture
+	
+		// glGetTexImage() - return a texture image in the 'pixels' array
+		int width, height; 
+		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
+		GLenum format = GL_RGBA;
+		GLenum type = GL_UNSIGNED_BYTE;
+		size_t bufferSize = width * height * 4; // (rgba)
+		unsigned char* pixels = new unsigned char[bufferSize];
+
+		// todo ? bind to gBuffer??
+		// bind to texture
+		glBindTexture(GL_TEXTURE_2D, gDepth);
+		glGetTexImage(GL_TEXTURE_2D, 0, format, type, pixels);
+
+   		// pixel data now in pixels arr
+		int rows = height;
+		int cols = width;
+
+		// run convolution kernel on texture
+		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
+			for (int j = 1; j < cols - 1; j++){
+				// extract the 3x3 pixel neighborhood of the current point
+				int neighborhood[3][3]
+				for (int ki = 0; ki < 3; ki++){
+					for (int kj = 0; kj < 3; kj++){
+						neighborhood[ki][kj] = pixels[i * 4][j * 4];
+					}
+					
+				}
+
+				//check the most recent light in the list, check the distance, 
+				//		if it's too close dont create the light
+				// ** threshold on distance to most recent light
+				
+				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
+				// gy = sobelY * neighborhood
+				// gMag = sqrt(gx^2 + gy^2)
+
+				// glmUnproject to retrieve
+				// if there is a significant change in intensity value, 
+					// TODO: RETRIEVE WORLD SPACE position using row/col into image
+					// retrieve depth by "reversing" the linearization shader logic
+					// add light to lights with new position
+		
+			}
+		}
+
+
+		// shader logic
+			// float gaussian[] = {0.0625, 0.125, 0.0625, 0.125, 0.25, 0.125, 0.0625, 0.125, 0.0625};
+			// vec2 offset[] = {vec2(-1, 1), vec2(-1, 0), vec2(-1, -1), vec2(0, 1), vec2(0, 0), vec2(0, -1), vec2(1, 1), vec2(1, 0), vec2(1, -1)};
+
+			// vec2 texSize = 1.0 / textureSize(lightMap, 0);
+			// float blur_radius = 5.0f;
+			// float blendedIntensity = 0.0f;
+
+			// for(int i = 0; i < 9; i++){
+			// 	blendedIntensity += (texture(lightMap, texCoord + (offset[i] * texSize * blur_radius))).r * gaussian[i];
+			// }
+			
+			// vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo;
+
+
+	}
  
 	void render(float frametime) {
 		// Get current frame buffer size.
