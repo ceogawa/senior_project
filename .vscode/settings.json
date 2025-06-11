@@ -1,6 +1,8 @@
 {
     "files.associations": {
         "vector": "cpp",
-        "__node_handle": "cpp"
+        "__node_handle": "cpp",
+        "__bit_reference": "cpp",
+        "ios": "cpp"
     }
 }
