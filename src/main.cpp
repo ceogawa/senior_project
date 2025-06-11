@@ -94,7 +94,7 @@ public:
 	GLuint lightAccumulationTexture = 0; 
 
 	// TODO not using light radius??
-	float light_radius = 0.09;
+	float light_radius = 0.2;
 
 	bool FirstTime = true;
 	bool DEFER = true;
@@ -496,8 +496,8 @@ public:
 		int cols = width;
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
-		float distanceThreshold = 1.0f;
-		float magnitudeThreshold = 0.7f;
+		float distanceThreshold = 0.2f;
+		float magnitudeThreshold = 0.005f;
 
 		// run convolution kernel on texture
 		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
@@ -523,44 +523,51 @@ public:
 				float gx = 0.0f, gy = 0.0f;
 				for (int k = 0; k < 3; k++){
 					for (int l = 0; l < 3; l++){
-						gx += sobelX[k][l]*neighborhood[k][l];
-						gy += sobelY[k][l]*neighborhood[k][l];
+						gx += sobelX[k][l] * neighborhood[k][l];
+						gy += sobelY[k][l] * neighborhood[k][l];
 					}
 				}
 				// gMag = sqrt(gx^2 + gy^2)
 				float gMag = sqrt((gx * gx) + (gy * gy)); 
+		
 
 				// if there is a significant change in intensity value, 
 				// retrieve depth by "reversing" the linearization shader logic
 				// add light to lights with new position
+
+				
 		
 				if (gMag > magnitudeThreshold){
-					// flip bc GL stores images bottom to top
-					int flipped_i = rows - i;
-					// undo shader linearization to retrieve depth
-					float storedDepth = pixels[(i * width + j) * 4];;
-					// float linearDepth = 1.0f - r;
-					    // storedDepth = 1.0 - linearDepth, so:
-					float linearDepth = 1.0f - storedDepth;
-					
-					// Convert back to actual world Z coordinate
-					float actualZ = -(linearDepth * (20.0f - 0.1f) + 0.1f);
-					
-					// For unProject, you typically want NDC depth [-1, 1]
-					// Convert your linear depth to NDC space
-					float ndcZ = (2.0f * linearDepth) - 1.0f;
-					vec3 screenCoords = vec3(j, flipped_i, 20.0f);
-					// vec3 screenCoords = vec3(j/(float)width, flipped_i/(float)height, linearDepth);
-					// TODO: RETRIEVE WORLD SPACE position using row/col into image
-					vec3 worldCoords = glm::unProject(screenCoords, viewMat * modelMat, projMat, vec4(0, 0, width, height));
-					// glm::vec3 worldCoords = glm::unProject(vec3(i, j, linearDepth), modelMat, viewMat, projMat, vec4(0, 0, width, height));
-					//check the most recent light in the list, check the distance, 
-					//		if it's too close dont create the light
-					// ** threshold on distance to most recent light
-					
-					if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
-						lights.push_back({worldCoords, lightColor});
+
+					// cout << "exceeds magnitude" << endl;
+					// flip bc GL stores images bottom to top??
+					int flipped_i = rows - i - 1;
+
+					lights.push_back({vec3(0.0f, 1.0f, 1.5f), lightColor});
+					if(lights.size() > 40){
+						return;
 					}
+				
+					// // undo shader linearization to retrieve depth
+					// float storedDepth = pixels[(i * width + j) * 4];;
+					// float linearDepth = 1.0f - storedDepth;
+					// float actualZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE);
+					// // ndc for unProject??
+					// // vec3 screenCoords = vec3(j, flipped_i, ndcZ);
+					// // vec3 screenCoords = vec3(j/(float)width, flipped_i/(float)height, linearDepth);
+					// // TODO: RETRIEVE WORLD SPACE position using row/col into image
+					// vec3 worldCoords = glm::unProject(screenCoords, viewMat * modelMat, projMat, vec4(0, 0, width, height));
+					// // glm::vec3 worldCoords = glm::unProject(vec3(i, j, linearDepth), modelMat, viewMat, projMat, vec4(0, 0, width, height));
+					// //check the most recent light in the list, check the distance, 
+					// //		if it's too close dont create the light
+					// // ** threshold on distance to most recent light
+					
+					// if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
+					// 	lights.push_back({worldCoords, lightColor});
+					// 	if(lights.size() > 40){
+					// 		return;
+					// 	}
+					// }
 					
 				}
 				
