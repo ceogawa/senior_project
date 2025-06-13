@@ -4,6 +4,7 @@
         "__node_handle": "cpp",
         "__bit_reference": "cpp",
         "ios": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "sstream": "cpp"
     }
 }

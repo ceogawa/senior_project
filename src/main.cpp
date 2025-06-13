@@ -449,9 +449,13 @@ public:
 		SetMaterial(1);
 		wall->draw(prog);
 
+		// ceiling
+		SetModel(prog, vec3(0.0f, 4.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
+		SetMaterial(1);
+		// wall->draw(prog);
+
 		//SetModel(prog, )
 
-		// ceiling??
 
 		// unbind after geometry pass
 		prog->unbind();
@@ -459,7 +463,6 @@ public:
 	}
 
 	void computeEdges(){
-
 		// define sobel kernels
 		int sobelX[3][3] = {{-1, 0, 1}, 
 							{-2, 0, 2}, 
@@ -477,10 +480,9 @@ public:
 		float aspect = width/(float)height;
 
 		mat4 projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
-		mat4 viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
 		// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
 		mat4 modelMat = mat4(1.0f);
-
+		mat4 viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
 
 		GLenum format = GL_RGBA;
 		GLenum type = GL_FLOAT;  
@@ -497,104 +499,52 @@ public:
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
 		float distanceThreshold = 0.5f;
-		float magnitudeThreshold = 0.1f;
+		float magnitudeThreshold = 0.05f;
 
 		// run convolution kernel on texture
 		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
 			for (int j = 1; j < cols - 1; j++){
 				// extract the 3x3 pixel neighborhood of the current point
-				float neighborhood[3][3];
-				for (int ki = 0; ki < 3; ki++){
-					for (int kj = 0; kj < 3; kj++){
-						// current pixel + offset into neighborhood * width (1D pixel array)
-						// + column offset + offset into neighborhood * 4 to get r channel
-						int pixelIndex = ((i + ki - 1) * width + (j + kj - 1)) * 4;
-						neighborhood[ki][kj] = pixels[pixelIndex]; 
-					}
-				}
-			
+				if(lights.size() > 20){ return; }
+				
 				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
 				// gy = sobelY * neighborhood
 				float gx = 0.0f, gy = 0.0f;
 				for (int k = 0; k < 3; k++){
 					for (int l = 0; l < 3; l++){
-						gx += sobelX[k][l] * neighborhood[k][l];
-						gy += sobelY[k][l] * neighborhood[k][l];
+						// current pixel + offset into neighborhood * width (1D pixel array)
+						// + column offset + offset into neighborhood * 4 to get r channel
+						int pixelIndex = ((i + k - 1) * width + (j + l - 1)) * 4;
+						gx += sobelX[k][l] * pixels[pixelIndex];
+						gy += sobelY[k][l] * pixels[pixelIndex];
 					}
 				}
 				// gMag = sqrt(gx^2 + gy^2)
 				float gMag = sqrt((gx * gx) + (gy * gy)); 
 		
-
-				// if there is a significant change in intensity value, 
-				// retrieve depth by "reversing" the linearization shader logic
-				// add light to lights with new position
-
+				// 1. if there is a significant change in intensity value, 
+				// 		retrieve depth by "reversing" the linearization shader logic
+				// 2. add light to lights with new position
 				
-		
 				if (gMag > magnitudeThreshold){
-					// // ndc?
-					// float ndcX = (2.0f * j) / width - 1.0f;
-					// // flip bc GL stores images bottom to top??
-                	// float ndcY = 1.0f - (2.0f * i) / height;  
-
-					// cout << "exceeds magnitude" << endl;
-					int flipped_i = rows - i - 1;
-
-					// // undo shader linearization to retrieve depth
-					// float storedDepth = 1.0f - pixels[(i * width + j) * 4]; // get the r channel bc grayscale
-					// cout << "stored depth: " << storedDepth <<endl;
-					// float actualZ =  -(storedDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE);
-					
-					// cout << "actual depth: " << actualZ << endl;
-					// // push back lights
-					// lights.push_back({vec3(0.0f, 1.0f, actualZ), lightColor});
-					// if(lights.size() > 120){
-					// 	return;
-					// }
 				
 					// undo shader linearization to retrieve depth
 					float storedDepth = pixels[(i * width + j) * 4];
 					float linearDepth = 1.0f - storedDepth;
-					cout << "linear depth: " << linearDepth << endl;
+					// cout << "linear depth: " << linearDepth << endl;
 					// float actualZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); ?
-
-					// ndc for unProject??
-					vec3 screenCoords = vec3(j,  i, linearDepth);
-					// TODO: RETRIEVE WORLD SPACE position using row/col into image
-					vec3 worldCoords = glm::unProject(screenCoords, viewMat * modelMat, projMat, vec4(0, 0, width, height));
-					// glm::vec3 worldCoords = glm::unProject(vec3(i, j, linearDepth), modelMat, viewMat, projMat, vec4(0, 0, width, height));
-					//check the most recent light in the list, check the distance, 
-					//		if it's too close dont create the light
+					vec3 screenCoords = vec3(j, i, linearDepth);
+					// RETRIEVE WORLD SPACE position using row/col into image
+					vec3 worldCoords = glm::unProject(screenCoords, modelMat * viewMat, projMat, vec4(0, 0, width, height));
 					// ** threshold on distance to most recent light
-					
 					if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
 						lights.push_back({worldCoords, lightColor});
-						if(lights.size() > 20){
-							return;
-						}
 					}
 					
 				}
 				
 			}
 		}
-
-
-	// 	// shader logic
-	// 		// float gaussian[] = {0.0625, 0.125, 0.0625, 0.125, 0.25, 0.125, 0.0625, 0.125, 0.0625};
-	// 		// vec2 offset[] = {vec2(-1, 1), vec2(-1, 0), vec2(-1, -1), vec2(0, 1), vec2(0, 0), vec2(0, -1), vec2(1, 1), vec2(1, 0), vec2(1, -1)};
-
-	// 		// vec2 texSize = 1.0 / textureSize(lightMap, 0);
-	// 		// float blur_radius = 5.0f;
-	// 		// float blendedIntensity = 0.0f;
-
-	// 		// for(int i = 0; i < 9; i++){
-	// 		// 	blendedIntensity += (texture(lightMap, texCoord + (offset[i] * texSize * blur_radius))).r * gaussian[i];
-	// 		// }
-			
-	// 		// vec3 diffuse = max(dot(Normal, lightDir), 0.0) * blendedIntensity * Albedo;
-
 
 	}
  
