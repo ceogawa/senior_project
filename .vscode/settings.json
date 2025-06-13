@@ -3,6 +3,7 @@
         "vector": "cpp",
         "__node_handle": "cpp",
         "__bit_reference": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "iostream": "cpp"
     }
 }

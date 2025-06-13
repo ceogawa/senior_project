@@ -481,12 +481,12 @@ public:
 		// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
 		mat4 modelMat = mat4(1.0f);
 
+
 		GLenum format = GL_RGBA;
 		GLenum type = GL_FLOAT;  
 		size_t bufferSize = width * height * 4 * sizeof(float);  
 		float* pixels = new float[bufferSize];  
 
-		// todo ? bind to gBuffer??
 		// bind to texture
 		glBindTexture(GL_TEXTURE_2D, gDepth);
 		glGetTexImage(GL_TEXTURE_2D, 0, format, type, pixels);
@@ -496,8 +496,8 @@ public:
 		int cols = width;
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
-		float distanceThreshold = 0.2f;
-		float magnitudeThreshold = 0.005f;
+		float distanceThreshold = 0.5f;
+		float magnitudeThreshold = 0.1f;
 
 		// run convolution kernel on texture
 		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
@@ -508,13 +508,8 @@ public:
 					for (int kj = 0; kj < 3; kj++){
 						// current pixel + offset into neighborhood * width (1D pixel array)
 						// + column offset + offset into neighborhood * 4 to get r channel
-
 						int pixelIndex = ((i + ki - 1) * width + (j + kj - 1)) * 4;
 						neighborhood[ki][kj] = pixels[pixelIndex]; 
-
-						// int pixelIndex = ((i + ki - 1) * width + (j + kj - 1)) * 4;
-						// neighborhood[ki][kj] = pixels[pixelIndex] / 255.0f; 	
-						// neighborhood[ki][kj] = pixels[i * 4][j * 4];
 					}
 				}
 			
@@ -538,36 +533,47 @@ public:
 				
 		
 				if (gMag > magnitudeThreshold){
+					// // ndc?
+					// float ndcX = (2.0f * j) / width - 1.0f;
+					// // flip bc GL stores images bottom to top??
+                	// float ndcY = 1.0f - (2.0f * i) / height;  
 
 					// cout << "exceeds magnitude" << endl;
-					// flip bc GL stores images bottom to top??
 					int flipped_i = rows - i - 1;
 
-					lights.push_back({vec3(0.0f, 1.0f, 1.5f), lightColor});
-					if(lights.size() > 40){
-						return;
-					}
-				
 					// // undo shader linearization to retrieve depth
-					// float storedDepth = pixels[(i * width + j) * 4];;
-					// float linearDepth = 1.0f - storedDepth;
-					// float actualZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE);
-					// // ndc for unProject??
-					// // vec3 screenCoords = vec3(j, flipped_i, ndcZ);
-					// // vec3 screenCoords = vec3(j/(float)width, flipped_i/(float)height, linearDepth);
-					// // TODO: RETRIEVE WORLD SPACE position using row/col into image
-					// vec3 worldCoords = glm::unProject(screenCoords, viewMat * modelMat, projMat, vec4(0, 0, width, height));
-					// // glm::vec3 worldCoords = glm::unProject(vec3(i, j, linearDepth), modelMat, viewMat, projMat, vec4(0, 0, width, height));
-					// //check the most recent light in the list, check the distance, 
-					// //		if it's too close dont create the light
-					// // ** threshold on distance to most recent light
+					// float storedDepth = 1.0f - pixels[(i * width + j) * 4]; // get the r channel bc grayscale
+					// cout << "stored depth: " << storedDepth <<endl;
+					// float actualZ =  -(storedDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE);
 					
-					// if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
-					// 	lights.push_back({worldCoords, lightColor});
-					// 	if(lights.size() > 40){
-					// 		return;
-					// 	}
+					// cout << "actual depth: " << actualZ << endl;
+					// // push back lights
+					// lights.push_back({vec3(0.0f, 1.0f, actualZ), lightColor});
+					// if(lights.size() > 120){
+					// 	return;
 					// }
+				
+					// undo shader linearization to retrieve depth
+					float storedDepth = pixels[(i * width + j) * 4];
+					float linearDepth = 1.0f - storedDepth;
+					cout << "linear depth: " << linearDepth << endl;
+					// float actualZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); ?
+
+					// ndc for unProject??
+					vec3 screenCoords = vec3(j,  i, linearDepth);
+					// TODO: RETRIEVE WORLD SPACE position using row/col into image
+					vec3 worldCoords = glm::unProject(screenCoords, viewMat * modelMat, projMat, vec4(0, 0, width, height));
+					// glm::vec3 worldCoords = glm::unProject(vec3(i, j, linearDepth), modelMat, viewMat, projMat, vec4(0, 0, width, height));
+					//check the most recent light in the list, check the distance, 
+					//		if it's too close dont create the light
+					// ** threshold on distance to most recent light
+					
+					if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
+						lights.push_back({worldCoords, lightColor});
+						if(lights.size() > 20){
+							return;
+						}
+					}
 					
 				}
 				
