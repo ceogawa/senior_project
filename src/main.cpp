@@ -486,7 +486,8 @@ public:
 
 		GLenum format = GL_RGBA;
 		GLenum type = GL_FLOAT;  
-		size_t bufferSize = width * height * 4 * sizeof(float);  
+		size_t bufferSize = width * height * 4 * sizeof(float);
+		// only realloc on resolution change  
 		float* pixels = new float[bufferSize];  
 
 		// bind to texture
@@ -545,6 +546,7 @@ public:
 				
 			}
 		}
+		// free pixel array
 
 	}
  
