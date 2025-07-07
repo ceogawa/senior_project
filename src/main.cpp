@@ -93,7 +93,7 @@ public:
 	GLuint lightAccumulationBuf = 0;
 	GLuint lightAccumulationTexture = 0; 
 
-	float light_radius = 0.03;
+	float light_radius = 0.015;
 
 	bool FirstTime = true;
 	bool DEFER = true;
@@ -497,14 +497,14 @@ public:
 		int cols = width;
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
-		float distanceThreshold = 2.0f;
-		float magnitudeThreshold = 0.75f;
+		float distanceThreshold = 0.4f;
+		float magnitudeThreshold = 0.2f;
 
 		// run convolution kernel on texture
 		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
 			for (int j = 1; j < cols - 1; j++){
 				// extract the 3x3 pixel neighborhood of the current point
-				if(lights.size() > 500){ return; }
+				if(lights.size() > 4000){ return; }
 				
 				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
 				// gy = sobelY * neighborhood
