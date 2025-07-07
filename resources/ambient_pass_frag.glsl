@@ -8,7 +8,7 @@ uniform vec3 lightDir;
 
 void main() {
 
-    float intensity = 0.5;
+    float intensity = 0.6;
     vec3 Albedo = texture(gColorSpec, texCoord).rgb;
     float Spec = texture(gColorSpec, texCoord).a;
     vec3 Normal = texture(gNormal, texCoord).rgb;

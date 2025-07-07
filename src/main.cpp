@@ -26,8 +26,12 @@ Press 'p' to toggle deferred shading
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define NEAR_PLANE 0.1f
+#define FAR_PLANE 20.0f
+
 using namespace std;
 using namespace glm;
+
 enum Mat {jade=0, brass, copper, grey, tone1, tone2, tone3, tone4, turquoise, shadow};
 
 struct Light {
@@ -80,6 +84,7 @@ public:
 	GLuint gPosition = 0;
 	GLuint gNormal = 0;
 	GLuint gColorSpec = 0;
+	GLuint gDepth = 0;
 	GLuint depthBuf = 0;
 	GLuint lightDepthBuf = 0; 
 	GLuint lightPositions = 0;
@@ -88,9 +93,7 @@ public:
 	GLuint lightAccumulationBuf = 0;
 	GLuint lightAccumulationTexture = 0; 
 
-	// TODO not using light radius??
-	float light_radius = 0.09;
-
+	float light_radius = 0.015;
 
 	bool FirstTime = true;
 	bool DEFER = true;
@@ -142,7 +145,6 @@ public:
 		//		vec3 fragPos;
 		//		vec3 fragNor; 
 		// to the geometry frag shader
-		
 
 		// TODO texprog? modify to pass color to defer
 		texProg = make_shared<Program>();
@@ -263,15 +265,15 @@ public:
 		createBuffer(&gNormal, width, height, GL_COLOR_ATTACHMENT1, 0);
 		// - color + specular color buffer
 		// use alpha channel of texture to decide specular intensity
-		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0); 
+		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0);
+		// - depth buffer
+		createBuffer(&gDepth, width, height, GL_COLOR_ATTACHMENT3, 0); 
+		
 
 		GLenum check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
 			std::cerr << "ERROR: GBUFFER is not complete! " << check << std::endl;
 		}
-		// Just reuse gDepthBuf
-
-		//glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
 
 		//////////////////////////////////////////////////////////////////////////////////////////////
 		glGenRenderbuffers(1, &depthBuf);
@@ -284,9 +286,8 @@ public:
 			std::cout << "Framebuffer not complete!" << std::endl;
 
 		//more FBO set up
-		GLenum DrawBuffers[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-		glDrawBuffers(3, DrawBuffers);
-
+		GLenum DrawBuffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+		glDrawBuffers(4, DrawBuffers);
 
 		///////////////////////////////////////////////////////////////////////////////////////////////
         // generate the light accumulation buffer
@@ -294,17 +295,6 @@ public:
 		glGenTextures(1, &lightAccumulationTexture);
 		// do I call gen again?
 		glGenRenderbuffers(1, &depthBuf);
-
-		// PREVIOUSLY
-		// bind to buffer
-		//glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);k
-		//createBuffer(&lightAccumulationTexture, width, height, GL_COLOR_ATTACHMENT0, 0); 
-				//glGenTextures(1, buffer);
-				//glBindTexture(GL_TEXTURE_2D, *buffer);
-				//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-				//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-				//glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, level);
 
 		// BASE CODE
 		createFBO(lightAccumulationBuf, lightAccumulationTexture);
@@ -314,14 +304,11 @@ public:
 		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthBuf);
 
-
 		GLenum DrawBuffer[1] = { GL_COLOR_ATTACHMENT0 };
 		glDrawBuffers(1, DrawBuffer);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		// DO I NEED THIS?
-		//createFBO(LframeBuf[1], LtexBuf[1]); ??
-
+		
 		initLights();
 
 	}
@@ -332,19 +319,20 @@ public:
 
 	void initLights() {
 
-		// TODO WIP light placement
-	    // ambient ceiling lights
-		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
-		for (int i = 0; i < 1000; i++){
-			lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
-		}
+		//// TODO WIP light placement
+	 //   // ambient ceiling lights
+		//lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		//lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		//lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
 
-		// lights behind couch
-		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
-			lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
-		}
+		///*for (int i = 0; i < 500; i++){
+		//	lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
+		//}*/
+
+		//// lights behind couch
+		//for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
+		//	lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
+		//}
 	}
 
 
@@ -460,12 +448,128 @@ public:
 		SetMaterial(1);
 		wall->draw(prog);
 
+		// ceiling
+		SetModel(prog, vec3(0.0f, 4.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
+		SetMaterial(1);
+		wall->draw(prog);
+
 		//SetModel(prog, )
 
-		// ceiling??
 
 		// unbind after geometry pass
 		prog->unbind();
+
+	}
+
+	void computeEdges(){
+		// define sobel kernels
+		int sobelX[3][3] = {{-1, 0, 1}, 
+							{-2, 0, 2}, 
+							{-1, 0, 1}};
+
+		int sobelY[3][3] = {{-1, -2, -1}, 
+							{0, 0, 0}, 
+							{1, 2, 1}};
+
+		// read in gDepth texture
+		
+		// glGetTexImage() - return a texture image in the 'pixels' array
+		int width, height; 
+		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
+		float aspect = width/(float)height;
+
+		mat4 projMat;
+		mat4 modelMat;
+		mat4 viewMat;
+
+		GLenum format = GL_RGBA;
+		GLenum type = GL_FLOAT;  
+		size_t bufferSize = width * height * 4 * sizeof(float);
+		// only realloc on resolution change  
+		float* pixels = new float[bufferSize];  
+
+		// bind to texture
+		glBindTexture(GL_TEXTURE_2D, gDepth);
+		glGetTexImage(GL_TEXTURE_2D, 0, format, type, pixels);
+
+   		// pixel data now in pixels arr
+		int rows = height;
+		int cols = width;
+
+		vec3 lightColor = vec3(1.0, 1.0, 1.0);
+		float distanceThreshold = 0.4f;
+		float magnitudeThreshold = 0.2f;
+
+		// run convolution kernel on texture
+		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
+			for (int j = 1; j < cols - 1; j++){
+				// extract the 3x3 pixel neighborhood of the current point
+				if(lights.size() > 4000){ return; }
+				
+				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
+				// gy = sobelY * neighborhood
+				float gx = 0.0f, gy = 0.0f;
+				for (int k = 0; k < 3; k++){
+					for (int l = 0; l < 3; l++){
+						// current pixel + offset into neighborhood * width (1D pixel array)
+						// + column offset + offset into neighborhood * 4 to get r channel
+						int pixelIndex = ((i + k - 1) * width + (j + l - 1)) * 4;
+						gx += sobelX[k][l] * pixels[pixelIndex];
+						gy += sobelY[k][l] * pixels[pixelIndex];
+					}
+				}
+				// gMag = sqrt(gx^2 + gy^2)
+				float gMag = sqrt((gx * gx) + (gy * gy)); 
+		
+				// 1. if there is a significant change in intensity value, 
+				// 		retrieve depth by "reversing" the linearization shader logic
+				// 2. add light to lights with new position		
+				if (gMag > magnitudeThreshold){
+					//cout << "magnitude of gradient: " << gMag << endl;
+					projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
+					// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
+					modelMat = mat4(1.0f);
+					viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
+				
+					// we have do undo what shaders do: world -> view -> clip space -> ndc -> screen space
+					
+					// retrieve pixel intensity at position (screen space)
+					float storedDepth = pixels[(i * width + j) * 4];
+					float linearDepth = 1.0f - storedDepth;
+
+					// this is ndc -> screen space: 0.5f * (normalize(fragNor) + vec3(1.0)); 
+					// now, screenspace -> ndc:  takes 0->width to -1->1
+					//float ndcX = (2.0f * j) / width - 1.0f; // j = col
+					//float ndcY = (2.0f * flipped_y) / (float)(height - 1.0f); 
+
+					// convert back to viewspace because fragpos in the geom shader is in viewspace
+					// (undo shader linearization to retrieve depth)
+					 float viewSpaceZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); 
+
+					 // the projection matrix goes from view space to clip space
+					 // Z_clip = 0*x + 0*y + (-(f+n)/(f-n))*z + (-2fn/(f-n))*w
+					 float a = (FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					 float b = (2.0f * FAR_PLANE * NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					 float ndc_z = a + b * (1.0f / viewSpaceZ);
+					 
+					// gl origin bottom left, texture origin top left
+					vec3 screenCoords = vec3(j, i, ndc_z);
+					// RETRIEVE WORLD SPACE position using row/col into image
+					vec3 worldCoords = glm::unProject(screenCoords, modelMat * viewMat, projMat, vec4(0, 0, width, height));
+					// ** threshold on distance to most recent light
+					float dist_to_cam = length(worldCoords - g_eye);
+					// maybe better way to check against adjacent "rows" in screenspace
+					if ((lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold))
+						&& (dist_to_cam > 0.5))
+					{
+						lights.push_back({worldCoords, lightColor});
+					}
+					
+				}
+				
+			}
+		}
+		// free pixel array
 
 	}
  
@@ -495,6 +599,9 @@ public:
 		mat4 P = SetProjectionMatrix(norProg); 
 		mat4 V = SetView(norProg);
 
+		// populates light array
+		lights.clear();
+		computeEdges();
 		// simplifies because we are only writing the normal data of the lights to the framebuffer
 		for (const Light& light : lights) {
 			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
@@ -513,6 +620,7 @@ public:
 			assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
 			assert(GLTextureWriter::WriteImage(gNormal, "gNorm.png"));
 			assert(GLTextureWriter::WriteImage(gColorSpec, "gColorSpec.png"));
+			assert(GLTextureWriter::WriteImage(gDepth, "gDepth.png"));
 			assert(GLTextureWriter::WriteImage(lightAccumulationBuf, "lightAccumBufNew.png"));
 			assert(GLTextureWriter::WriteImage(lightAccumulationTexture, "lightAccumulation.png"));
 			FirstTime = false;
@@ -558,6 +666,10 @@ public:
 				glDisableVertexAttribArray(0);
 
 			ambientProg->unbind();
+
+			//// populates light array
+			//lights.clear();
+			//computeEdges();
 
 			// 3. enable stencil testing 
 			// conditionally eliminates pixels based on comparison test
@@ -677,7 +789,7 @@ public:
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		float aspect = width/(float)height;
 		
-		mat4 Projection = perspective(radians(50.0f), aspect, 0.1f, 100.0f);
+		mat4 Projection = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
 	}
@@ -691,6 +803,7 @@ public:
 		glUniformMatrix4fv(curS->getUniform("M"), 1, GL_FALSE, value_ptr(ctm));
 	}
 
+
 	/*normal game camera */
 	mat4 SetView(shared_ptr<Program> curShade) {
 		mat4 Cam = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
@@ -700,6 +813,7 @@ public:
 
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods) {
     	cout << "use two finger mouse scroll" << endl;
+
 	}
 
 	void resizeCallback(GLFWwindow *window, int width, int height)
@@ -777,10 +891,38 @@ public:
 		if (key == GLFW_KEY_S && action == GLFW_PRESS) {
 			MOVEB = true;
 		}
-		if (key == GLFW_KEY_Q && action == GLFW_PRESS)
-			g_light.x += 0.5; 
-		if (key == GLFW_KEY_E && action == GLFW_PRESS)
-			g_light.x -= 0.5; 
+		if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+			/*g_light.x += 0.5; */
+			vec3 diff, newV;
+			g_theta += 0.15;
+			newV.x = cosf(g_phi) * cosf(g_theta);
+			newV.y = -1.0 * sinf(g_phi);
+			newV.z = 1.0 * cosf(g_phi) * cosf((3.14 / 2.0 - g_theta));
+			diff.x = (g_lookAt.x - g_eye.x) - newV.x;
+			diff.y = (g_lookAt.y - g_eye.y) - newV.y;
+			diff.z = (g_lookAt.z - g_eye.z) - newV.z;
+			g_lookAt.x = g_lookAt.x - diff.x;
+			g_lookAt.y = g_lookAt.y - diff.y;
+			g_lookAt.z = g_lookAt.z - diff.z;
+			view = g_eye - g_lookAt;
+			strafe = cross(vec3(0, 1, 0), view);
+		}
+		if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+			//g_light.x -= 0.5; 
+			vec3 diff, newV;
+			g_theta -= 0.15;
+			newV.x = cosf(g_phi) * cosf(g_theta);
+			newV.y = -1.0 * sinf(g_phi);
+			newV.z = 1.0 * cosf(g_phi) * cosf((3.14 / 2.0 - g_theta));
+			diff.x = (g_lookAt.x - g_eye.x) - newV.x;
+			diff.y = (g_lookAt.y - g_eye.y) - newV.y;
+			diff.z = (g_lookAt.z - g_eye.z) - newV.z;
+			g_lookAt.x = g_lookAt.x - diff.x;
+			g_lookAt.y = g_lookAt.y - diff.y;
+			g_lookAt.z = g_lookAt.z - diff.z;
+			view = g_eye - g_lookAt;
+			strafe = cross(vec3(0, 1, 0), view);
+		}
 		if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		}
