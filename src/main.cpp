@@ -93,8 +93,7 @@ public:
 	GLuint lightAccumulationBuf = 0;
 	GLuint lightAccumulationTexture = 0; 
 
-	// TODO not using light radius??
-	float light_radius = 0.2;
+	float light_radius = 0.03;
 
 	bool FirstTime = true;
 	bool DEFER = true;
@@ -320,20 +319,20 @@ public:
 
 	void initLights() {
 
-		// TODO WIP light placement
-	    // ambient ceiling lights
-		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
+		//// TODO WIP light placement
+	 //   // ambient ceiling lights
+		//lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		//lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		//lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
 
-		for (int i = 0; i < 900; i++){
-			lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
-		}
+		///*for (int i = 0; i < 500; i++){
+		//	lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
+		//}*/
 
-		// lights behind couch
-		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
-			lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
-		}
+		//// lights behind couch
+		//for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
+		//	lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
+		//}
 	}
 
 
@@ -452,7 +451,7 @@ public:
 		// ceiling
 		SetModel(prog, vec3(0.0f, 4.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
 		SetMaterial(1);
-		// wall->draw(prog);
+		wall->draw(prog);
 
 		//SetModel(prog, )
 
@@ -479,10 +478,9 @@ public:
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		float aspect = width/(float)height;
 
-		mat4 projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
-		// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
-		mat4 modelMat = mat4(1.0f);
-		mat4 viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
+		mat4 projMat;
+		mat4 modelMat;
+		mat4 viewMat;
 
 		GLenum format = GL_RGBA;
 		GLenum type = GL_FLOAT;  
@@ -499,14 +497,14 @@ public:
 		int cols = width;
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
-		float distanceThreshold = 0.5f;
-		float magnitudeThreshold = 0.05f;
+		float distanceThreshold = 2.0f;
+		float magnitudeThreshold = 0.75f;
 
 		// run convolution kernel on texture
 		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
 			for (int j = 1; j < cols - 1; j++){
 				// extract the 3x3 pixel neighborhood of the current point
-				if(lights.size() > 20){ return; }
+				if(lights.size() > 500){ return; }
 				
 				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
 				// gy = sobelY * neighborhood
@@ -525,20 +523,45 @@ public:
 		
 				// 1. if there is a significant change in intensity value, 
 				// 		retrieve depth by "reversing" the linearization shader logic
-				// 2. add light to lights with new position
-				
+				// 2. add light to lights with new position		
 				if (gMag > magnitudeThreshold){
+					//cout << "magnitude of gradient: " << gMag << endl;
+					projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
+					// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
+					modelMat = mat4(1.0f);
+					viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
 				
-					// undo shader linearization to retrieve depth
+					// we have do undo what shaders do: world -> view -> clip space -> ndc -> screen space
+					
+					// retrieve pixel intensity at position (screen space)
 					float storedDepth = pixels[(i * width + j) * 4];
 					float linearDepth = 1.0f - storedDepth;
-					// cout << "linear depth: " << linearDepth << endl;
-					// float actualZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); ?
-					vec3 screenCoords = vec3(j, i, linearDepth);
+
+					// this is ndc -> screen space: 0.5f * (normalize(fragNor) + vec3(1.0)); 
+					// now, screenspace -> ndc:  takes 0->width to -1->1
+					//float ndcX = (2.0f * j) / width - 1.0f; // j = col
+					//float ndcY = (2.0f * flipped_y) / (float)(height - 1.0f); 
+
+					// convert back to viewspace because fragpos in the geom shader is in viewspace
+					// (undo shader linearization to retrieve depth)
+					 float viewSpaceZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); 
+
+					 // the projection matrix goes from view space to clip space
+					 // Z_clip = 0*x + 0*y + (-(f+n)/(f-n))*z + (-2fn/(f-n))*w
+					 float a = (FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					 float b = (2.0f * FAR_PLANE * NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					 float ndc_z = a + b * (1.0f / viewSpaceZ);
+					 
+					// gl origin bottom left, texture origin top left
+					vec3 screenCoords = vec3(j, i, ndc_z);
 					// RETRIEVE WORLD SPACE position using row/col into image
 					vec3 worldCoords = glm::unProject(screenCoords, modelMat * viewMat, projMat, vec4(0, 0, width, height));
 					// ** threshold on distance to most recent light
-					if (lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold)){
+					float dist_to_cam = length(worldCoords - g_eye);
+					// maybe better way to check against adjacent "rows" in screenspace
+					if ((lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold))
+						&& (dist_to_cam > 0.5))
+					{
 						lights.push_back({worldCoords, lightColor});
 					}
 					
@@ -576,6 +599,9 @@ public:
 		mat4 P = SetProjectionMatrix(norProg); 
 		mat4 V = SetView(norProg);
 
+		// populates light array
+		lights.clear();
+		computeEdges();
 		// simplifies because we are only writing the normal data of the lights to the framebuffer
 		for (const Light& light : lights) {
 			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
@@ -641,9 +667,9 @@ public:
 
 			ambientProg->unbind();
 
-			// populates light array
-			lights.clear();
-			computeEdges();
+			//// populates light array
+			//lights.clear();
+			//computeEdges();
 
 			// 3. enable stencil testing 
 			// conditionally eliminates pixels based on comparison test
@@ -787,6 +813,7 @@ public:
 
 	void mouseCallback(GLFWwindow *window, int button, int action, int mods) {
     	cout << "use two finger mouse scroll" << endl;
+
 	}
 
 	void resizeCallback(GLFWwindow *window, int width, int height)
@@ -864,10 +891,38 @@ public:
 		if (key == GLFW_KEY_S && action == GLFW_PRESS) {
 			MOVEB = true;
 		}
-		if (key == GLFW_KEY_Q && action == GLFW_PRESS)
-			g_light.x += 0.5; 
-		if (key == GLFW_KEY_E && action == GLFW_PRESS)
-			g_light.x -= 0.5; 
+		if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
+			/*g_light.x += 0.5; */
+			vec3 diff, newV;
+			g_theta += 0.15;
+			newV.x = cosf(g_phi) * cosf(g_theta);
+			newV.y = -1.0 * sinf(g_phi);
+			newV.z = 1.0 * cosf(g_phi) * cosf((3.14 / 2.0 - g_theta));
+			diff.x = (g_lookAt.x - g_eye.x) - newV.x;
+			diff.y = (g_lookAt.y - g_eye.y) - newV.y;
+			diff.z = (g_lookAt.z - g_eye.z) - newV.z;
+			g_lookAt.x = g_lookAt.x - diff.x;
+			g_lookAt.y = g_lookAt.y - diff.y;
+			g_lookAt.z = g_lookAt.z - diff.z;
+			view = g_eye - g_lookAt;
+			strafe = cross(vec3(0, 1, 0), view);
+		}
+		if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+			//g_light.x -= 0.5; 
+			vec3 diff, newV;
+			g_theta -= 0.15;
+			newV.x = cosf(g_phi) * cosf(g_theta);
+			newV.y = -1.0 * sinf(g_phi);
+			newV.z = 1.0 * cosf(g_phi) * cosf((3.14 / 2.0 - g_theta));
+			diff.x = (g_lookAt.x - g_eye.x) - newV.x;
+			diff.y = (g_lookAt.y - g_eye.y) - newV.y;
+			diff.z = (g_lookAt.z - g_eye.z) - newV.z;
+			g_lookAt.x = g_lookAt.x - diff.x;
+			g_lookAt.y = g_lookAt.y - diff.y;
+			g_lookAt.z = g_lookAt.z - diff.z;
+			view = g_eye - g_lookAt;
+			strafe = cross(vec3(0, 1, 0), view);
+		}
 		if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
 			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
 		}
