@@ -186,6 +186,7 @@ public:
 		backProg->addUniform("lightRadius");
 		// TODO readded lightmap (sampling normals from here)
 		backProg->addUniform("lightMap");
+		//backProg->addUniform("gDepth");
 		backProg->addUniform("P");
 		backProg->addUniform("V");
 		backProg->addUniform("M");
@@ -739,12 +740,14 @@ public:
 
 				// do not have to write to the stencil, only read and chek against it
 				glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+				// should this be gl stencil op separate?
 
 				// for all BACK facing polygons:
 				//    if the stencil fails (it wont) then keep stencil value
 				//    if the stencil passes but the depth fails, DISCARD stencil value (depth >= check ??)
 				//    if the stencil and the depth pass, KEEP
 				// TODO how to configure depth and stencil testing for back faces
+				glDepthFunc(GL_ALWAYS);
 
 				// cull FRONT faces
 				glCullFace(GL_FRONT);
@@ -758,6 +761,8 @@ public:
 				glBindTexture(GL_TEXTURE_2D, gColorSpec);
 				glActiveTexture(GL_TEXTURE3);
 				glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
+		/*		glActiveTexture(GL_TEXTURE4);
+				glBindTexture(GL_TEXTURE_2D, gDepth);*/
 
 				// GLint loc = backProg->getUniform("gPosition");
 				// if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
@@ -765,14 +770,19 @@ public:
 				glUniform1i(backProg->getUniform("gNormal"), 1);
 				glUniform1i(backProg->getUniform("gColorSpec"), 2);
 				glUniform1i(backProg->getUniform("lightMap"), 3);
+				//glUniform1i(backProg->getUniform("gDepth"), 4);/
 
-				glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
+				V = SetView(backProg);
+
+				vec4 lightViewPos = V * vec4(light.Position, 1.0);//
+
+				glUniform3f(backProg->getUniform("lightPos"), lightViewPos.x, lightViewPos.y, lightViewPos.z);
 				glUniform1f(backProg->getUniform("lightRadius"), light.radius);
 				glUniform2f(backProg->getUniform("resolution"), width, height);
 				//cout << "width: " << width << "height: " << height << endl;
 
 				P = SetProjectionMatrix(backProg);
-				V = SetView(backProg);
+
 				SetModel(backProg, light.Position, 0.0f, 0.0f, light.radius, light.radius, light.radius);
 				lightVolume->draw(backProg);
 				backProg->unbind();
