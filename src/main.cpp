@@ -608,7 +608,7 @@ public:
 
 		// populates light array
 		lights.clear();
-		computeEdges();
+		//computeEdges();
 
 		// lights behind couch
 		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
@@ -776,7 +776,9 @@ public:
 
 				vec4 lightViewPos = V * vec4(light.Position, 1.0);//
 
+				//glUniform3f(backProg->getUniform("lightPos"), lightViewPos.x, lightViewPos.y, lightViewPos.z);
 				glUniform3f(backProg->getUniform("lightPos"), lightViewPos.x, lightViewPos.y, lightViewPos.z);
+
 				glUniform1f(backProg->getUniform("lightRadius"), light.radius);
 				glUniform2f(backProg->getUniform("resolution"), width, height);
 				//cout << "width: " << width << "height: " << height << endl;

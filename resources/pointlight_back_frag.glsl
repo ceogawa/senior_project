@@ -50,10 +50,10 @@ void main() {
     vec3 diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // vec3 diffuse;
 
-    if(d <= lightRadius && d != 0){
-        //diffuse = vec3(1.0f, 0.0f, 0.0f);
-        diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * (d/float(lightRadius));
-        //diffuse = diffuse * (1/float(d*d));
+    if(d != 0){
+       // diffuse = vec3(1.0f, 0.0f, 0.0f);
+       // diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * (d/float(lightRadius));
+        diffuse = diffuse * (1/(float(d*d) + d));
      }
 
     // no longer using light normals to calculate light direction
