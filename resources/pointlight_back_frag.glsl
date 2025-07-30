@@ -10,10 +10,12 @@ uniform sampler2D gColorSpec;
 uniform sampler2D lightMap;
 
 uniform vec3 lightPos;
-uniform vec3 lightCol;
+//uniform vec3 lightCol;
+uniform float lightRadius;
+
 uniform vec2 resolution;
 
-float lightRadius = 0.5;
+//float lightRadius = 0.5;
 
 void main() {
     // MAC window resolution

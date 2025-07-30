@@ -2,3 +2,5 @@ build/
 build2/
 x64/
 Texture_output.png
+.vs/
+.vscode/

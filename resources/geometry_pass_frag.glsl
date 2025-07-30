@@ -31,7 +31,7 @@ void main()
 
     // gDepth = vec3(0.5f * (-fragPos.z + vec3(1.0)));
     // linearize depth based on viewspace near and far planes
-    float linearDepth = (-fragPos.z - 0.1f)/(20.0f - 0.1f);
+    float linearDepth = (-fragPos.z - 0.1f)/(14.0f - 0.1f);
     // //  map to ndc?
     // gDepth = vec3(1.0f - vec3(0.5f * (linearDepth + vec3(1.0))));
    

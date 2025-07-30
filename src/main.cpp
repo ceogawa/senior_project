@@ -27,16 +27,17 @@ Press 'p' to toggle deferred shading
 #include <glm/gtc/matrix_transform.hpp>
 
 #define NEAR_PLANE 0.1f
-#define FAR_PLANE 20.0f
+#define FAR_PLANE 14.0f
 
 using namespace std;
 using namespace glm;
 
-enum Mat {jade=0, brass, copper, grey, tone1, tone2, tone3, tone4, turquoise, shadow};
+enum Mat { jade = 0, brass, copper, grey, tone1, tone2, tone3, tone4, turquoise, shadow };
 
 struct Light {
 	vec3 Position;
 	vec3 Color;
+	float radius;
 };
 
 
@@ -46,7 +47,7 @@ class Application : public EventCallbacks
 
 public:
 
-	WindowManager * windowManager = nullptr;
+	WindowManager* windowManager = nullptr;
 
 	// Our shader program
 	std::shared_ptr<Program> prog;
@@ -86,12 +87,12 @@ public:
 	GLuint gColorSpec = 0;
 	GLuint gDepth = 0;
 	GLuint depthBuf = 0;
-	GLuint lightDepthBuf = 0; 
+	GLuint lightDepthBuf = 0;
 	GLuint lightPositions = 0;
 	GLuint lightColors = 0;
 	GLuint lightMap = 0;
 	GLuint lightAccumulationBuf = 0;
-	GLuint lightAccumulationTexture = 0; 
+	GLuint lightAccumulationTexture = 0;
 
 	float light_radius = 0.015;
 
@@ -104,7 +105,7 @@ public:
 	vec3 view = vec3(0, 0, 1);
 	vec3 strafe = vec3(1, 0, 0);
 	vec3 g_eye = vec3(0, 1, 4);
-	vec3 g_lookAt = vec3(0, 1, -1); 
+	vec3 g_lookAt = vec3(0, 1, -1);
 	bool MOVEF = false;
 	bool MOVEB = false;
 	bool MOVER = false;
@@ -117,7 +118,7 @@ public:
 		GLSL::checkVersion();
 
 		g_phi = 0;
-		g_theta = -3.14/2.0;
+		g_theta = -3.14 / 2.0;
 
 		// Set background color.
 		glClearColor(0.01, 0.01, 0.01, 1.0f);
@@ -182,7 +183,7 @@ public:
 		backProg->addUniform("gNormal");
 		backProg->addUniform("gColorSpec");
 		backProg->addUniform("lightPos");
-		backProg->addUniform("lightCol");
+		backProg->addUniform("lightRadius");
 		// TODO readded lightmap (sampling normals from here)
 		backProg->addUniform("lightMap");
 		backProg->addUniform("P");
@@ -198,7 +199,7 @@ public:
 			resourceDirectory + "/ambient_pass_frag.glsl"
 		);
 		ambientProg->init();
-		ambientProg->addAttribute("vertPos"); 
+		ambientProg->addAttribute("vertPos");
 		ambientProg->addUniform("gColorSpec");
 		ambientProg->addUniform("gNormal");
 		ambientProg->addUniform("lightDir");
@@ -214,7 +215,7 @@ public:
 		// add gbuffer uniforms to frag shader
 		volumesNoCullingProg->addUniform("gPosition");
 		volumesNoCullingProg->addUniform("gNormal");
-		volumesNoCullingProg->addUniform("gColorSpec"); 
+		volumesNoCullingProg->addUniform("gColorSpec");
 		volumesNoCullingProg->addUniform("lightBuf");
 		//volumesNoCullingProg->addUniform("lightPos");
 		//volumesNoCullingProg->addUniform("lightCol");
@@ -242,7 +243,7 @@ public:
 
 	}
 
-	void createBuffer(GLuint *buffer, int width, int height, GLenum attachment, GLuint level) {
+	void createBuffer(GLuint* buffer, int width, int height, GLenum attachment, GLuint level) {
 		glGenTextures(1, buffer);
 		glBindTexture(GL_TEXTURE_2D, *buffer);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -250,10 +251,10 @@ public:
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, *buffer, level);
 	}
-	
-	void initBuffers( ) {
+
+	void initBuffers() {
 		int width, height;
-		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height); 
+		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 
 		glGenFramebuffers(1, &gBuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
@@ -267,8 +268,8 @@ public:
 		// use alpha channel of texture to decide specular intensity
 		createBuffer(&gColorSpec, width, height, GL_COLOR_ATTACHMENT2, 0);
 		// - depth buffer
-		createBuffer(&gDepth, width, height, GL_COLOR_ATTACHMENT3, 0); 
-		
+		createBuffer(&gDepth, width, height, GL_COLOR_ATTACHMENT3, 0);
+
 
 		GLenum check = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		if (check != GL_FRAMEBUFFER_COMPLETE) {
@@ -286,11 +287,11 @@ public:
 			std::cout << "Framebuffer not complete!" << std::endl;
 
 		//more FBO set up
-		GLenum DrawBuffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+		GLenum DrawBuffers[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
 		glDrawBuffers(4, DrawBuffers);
 
 		///////////////////////////////////////////////////////////////////////////////////////////////
-        // generate the light accumulation buffer
+		// generate the light accumulation buffer
 		glGenFramebuffers(1, &lightAccumulationBuf);
 		glGenTextures(1, &lightAccumulationTexture);
 		// do I call gen again?
@@ -308,12 +309,12 @@ public:
 		glDrawBuffers(1, DrawBuffer);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		
+
 		initLights();
 
 	}
 
-	float niceRandom(){
+	float niceRandom() {
 		return -1.0 + 2.0 * (float(rand()) / float(RAND_MAX));
 	}
 
@@ -367,7 +368,7 @@ public:
 		//Initialize the geometry to render a quad to the screen
 		initQuad();
 
-		sofa = initMultiMesh("/objs/sofa.obj", sofa); 
+		sofa = initMultiMesh("/objs/sofa.obj", sofa);
 		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
 		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
 		wall = initMesh("/objs/wall.obj", wall);
@@ -378,30 +379,33 @@ public:
 	}
 
 	void cameraUpdate() {
-      //camera movement - made continuous while keypressed
-      float speed = 0.05;
-      if (MOVEL){
-        g_eye -= speed*strafe;
-        g_lookAt -= speed*strafe;
-      } else if (MOVER) {
-        g_eye += speed*strafe;
-        g_lookAt += speed*strafe;
-      } else if (MOVEF) {
-        g_eye -= speed*view;
-        g_lookAt -= speed*view;
-      } else if (MOVEB) {
-        g_eye += speed*view;
-        g_lookAt += speed*view;
-      }
-    }
-	
+		//camera movement - made continuous while keypressed
+		float speed = 0.05;
+		if (MOVEL) {
+			g_eye -= speed * strafe;
+			g_lookAt -= speed * strafe;
+		}
+		else if (MOVER) {
+			g_eye += speed * strafe;
+			g_lookAt += speed * strafe;
+		}
+		else if (MOVEF) {
+			g_eye -= speed * view;
+			g_lookAt -= speed * view;
+		}
+		else if (MOVEB) {
+			g_eye += speed * view;
+			g_lookAt += speed * view;
+		}
+	}
+
 
 	void drawGeometry() {
 		prog->bind();
 
 		// Create projection and view matricies
 		mat4 P = SetProjectionMatrix(prog);
-		mat4 V = SetView(prog); 
+		mat4 V = SetView(prog);
 
 		// set model sets up Model matrix
 
@@ -423,7 +427,7 @@ public:
 
 		// LAMP
 		for (int i = 0; i < lamp.size(); i++) {
-			SetModel(prog, vec3(1.4f, 0.7f, 0.9f), 3.14f , 0.0f, 2.0f, 2.0f, 2.0f);
+			SetModel(prog, vec3(1.4f, 0.7f, 0.9f), 3.14f, 0.0f, 2.0f, 2.0f, 2.0f);
 			SetMaterial(3);
 			lamp[i]->draw(prog);
 		}
@@ -461,56 +465,56 @@ public:
 
 	}
 
-	void computeEdges(){
+	void computeEdges() {
 		// define sobel kernels
-		int sobelX[3][3] = {{-1, 0, 1}, 
-							{-2, 0, 2}, 
-							{-1, 0, 1}};
+		int sobelX[3][3] = { {-1, 0, 1},
+							{-2, 0, 2},
+							{-1, 0, 1} };
 
-		int sobelY[3][3] = {{-1, -2, -1}, 
-							{0, 0, 0}, 
-							{1, 2, 1}};
+		int sobelY[3][3] = { {-1, -2, -1},
+							{0, 0, 0},
+							{1, 2, 1} };
 
 		// read in gDepth texture
-		
+
 		// glGetTexImage() - return a texture image in the 'pixels' array
-		int width, height; 
+		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
-		float aspect = width/(float)height;
+		float aspect = width / (float)height;
 
 		mat4 projMat;
 		mat4 modelMat;
 		mat4 viewMat;
 
 		GLenum format = GL_RGBA;
-		GLenum type = GL_FLOAT;  
-		size_t bufferSize = width * height * 4 * sizeof(float);
+		GLenum type = GL_FLOAT;
+		int bufferSize = width * height * 4;// *sizeof(float);
 		// only realloc on resolution change  
-		float* pixels = new float[bufferSize];  
+		float* pixels = new float[bufferSize];
 
 		// bind to texture
 		glBindTexture(GL_TEXTURE_2D, gDepth);
 		glGetTexImage(GL_TEXTURE_2D, 0, format, type, pixels);
 
-   		// pixel data now in pixels arr
+		// pixel data now in pixels arr
 		int rows = height;
 		int cols = width;
 
 		vec3 lightColor = vec3(1.0, 1.0, 1.0);
-		float distanceThreshold = 0.4f;
-		float magnitudeThreshold = 0.2f;
+		float distanceThreshold = 0.09f;
+		float magnitudeThreshold = 0.1f;
 
 		// run convolution kernel on texture
-		for (int i = 1; i < rows - 1; i++){ // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
-			for (int j = 1; j < cols - 1; j++){
+		for (int i = 1; i < rows - 1; i++) { // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
+			for (int j = 1; j < cols - 1; j++) {
 				// extract the 3x3 pixel neighborhood of the current point
-				if(lights.size() > 4000){ return; }
-				
+				if (lights.size() > 5000) { return; }
+
 				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
 				// gy = sobelY * neighborhood
 				float gx = 0.0f, gy = 0.0f;
-				for (int k = 0; k < 3; k++){
-					for (int l = 0; l < 3; l++){
+				for (int k = 0; k < 3; k++) {
+					for (int l = 0; l < 3; l++) {
 						// current pixel + offset into neighborhood * width (1D pixel array)
 						// + column offset + offset into neighborhood * 4 to get r channel
 						int pixelIndex = ((i + k - 1) * width + (j + l - 1)) * 4;
@@ -519,20 +523,20 @@ public:
 					}
 				}
 				// gMag = sqrt(gx^2 + gy^2)
-				float gMag = sqrt((gx * gx) + (gy * gy)); 
-		
+				float gMag = sqrt((gx * gx) + (gy * gy));
+
 				// 1. if there is a significant change in intensity value, 
 				// 		retrieve depth by "reversing" the linearization shader logic
 				// 2. add light to lights with new position		
-				if (gMag > magnitudeThreshold){
+				if (gMag > magnitudeThreshold) {
 					//cout << "magnitude of gradient: " << gMag << endl;
 					projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
 					// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
 					modelMat = mat4(1.0f);
 					viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
-				
+
 					// we have do undo what shaders do: world -> view -> clip space -> ndc -> screen space
-					
+
 					// retrieve pixel intensity at position (screen space)
 					float storedDepth = pixels[(i * width + j) * 4];
 					float linearDepth = 1.0f - storedDepth;
@@ -544,14 +548,15 @@ public:
 
 					// convert back to viewspace because fragpos in the geom shader is in viewspace
 					// (undo shader linearization to retrieve depth)
-					 float viewSpaceZ =  -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE); 
+					float viewSpaceZ = -(linearDepth * (FAR_PLANE - NEAR_PLANE) + NEAR_PLANE);
 
-					 // the projection matrix goes from view space to clip space
-					 // Z_clip = 0*x + 0*y + (-(f+n)/(f-n))*z + (-2fn/(f-n))*w
-					 float a = (FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
-					 float b = (2.0f * FAR_PLANE * NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
-					 float ndc_z = a + b * (1.0f / viewSpaceZ);
-					 
+					// the projection matrix goes from view space to clip space
+					// Z_clip = 0*x + 0*y + (-(f+n)/(f-n))*z + (-2fn/(f-n))*w
+					float a = (FAR_PLANE + NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					float b = (2.0f * FAR_PLANE * NEAR_PLANE) / (FAR_PLANE - NEAR_PLANE);
+					//******** glm unproject takes in screen coordinated with the normalized device coordinates for depth***********
+					float ndc_z = a + b * (1.0f / viewSpaceZ);
+
 					// gl origin bottom left, texture origin top left
 					vec3 screenCoords = vec3(j, i, ndc_z);
 					// RETRIEVE WORLD SPACE position using row/col into image
@@ -559,34 +564,35 @@ public:
 					// ** threshold on distance to most recent light
 					float dist_to_cam = length(worldCoords - g_eye);
 					// maybe better way to check against adjacent "rows" in screenspace
-					if ((lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold))
-						&& (dist_to_cam > 0.5))
-					{
-						lights.push_back({worldCoords, lightColor});
-					}
-					
+					/*if ((lights.empty() || (length(worldCoords - (lights[lights.size() - 1].Position)) > distanceThreshold))
+						&& (dist_to_cam > 0.1))
+					{*/
+					lights.push_back({ worldCoords, lightColor, light_radius });
+					//}
+
 				}
-				
+
 			}
 		}
 		// free pixel array
+		delete(pixels);
 
 	}
- 
+
 	void render(float frametime) {
 		// Get current frame buffer size.
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
 		glViewport(0, 0, width, height);
 
-		 //camera movement - made continuous while keypressed
+		//camera movement - made continuous while keypressed
 		cameraUpdate();
 
-        // bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
+		// bind to gBuffer so the prog shader will write geometry to gbuffer for deferred pass
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 		// Clear framebuffer.
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
- 
+
 		// GEOMETRY PASS (sets up gbuffer for scene)
 		drawGeometry();
 
@@ -594,19 +600,25 @@ public:
 		// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
 		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
 		// clear the color buffer before all light computations
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); 
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		norProg->bind();
-		mat4 P = SetProjectionMatrix(norProg); 
+		mat4 P = SetProjectionMatrix(norProg);
 		mat4 V = SetView(norProg);
 
 		// populates light array
 		lights.clear();
 		computeEdges();
+
+		// lights behind couch
+		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
+			lights.push_back({ glm::vec3(x, 0.6f, 2.0f), glm::vec3(0.3f, 0.7f, 1.0f), 0.4 }); // Cool blue
+		}
+
 		// simplifies because we are only writing the normal data of the lights to the framebuffer
 		for (const Light& light : lights) {
 			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
-			//glUniform3f(volumesNoCullingProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
-			SetModel(norProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+			//glUniform1f(norProg->getUniform("lightRadius"), light.radius);
+			SetModel(norProg, light.Position, 0.0f, 0.0f, light.radius, light.radius, light.radius);
 			lightVolume->draw(norProg);
 		}
 		norProg->unbind();
@@ -632,7 +644,7 @@ public:
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 			// from (0, 0) to (width, height)
 			glBlitFramebuffer(
-				0, 0, width, height, 
+				0, 0, width, height,
 				0, 0, width, height,
 				GL_DEPTH_BUFFER_BIT, GL_NEAREST
 			);
@@ -649,21 +661,21 @@ public:
 			// WRITE AMBIENT CONTRIBUTION TO CORRESPONDING DEPTH
 			glDepthMask(GL_FALSE);
 			ambientProg->bind();
-				glActiveTexture(GL_TEXTURE0);
-				glBindTexture(GL_TEXTURE_2D, gColorSpec); 
-				glActiveTexture(GL_TEXTURE1);
-				glBindTexture(GL_TEXTURE_2D, gNormal); 
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, gColorSpec);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, gNormal);
 
-				glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
-				glUniform1i(ambientProg->getUniform("gNormal"), 1);
-				glUniform3f(ambientProg->getUniform("lightDir"), 1, -1, 0);
+			glUniform1i(ambientProg->getUniform("gColorSpec"), 0);
+			glUniform1i(ambientProg->getUniform("gNormal"), 1);
+			glUniform3f(ambientProg->getUniform("lightDir"), 0, 1, 1);
 
-				// draw quad
-				glEnableVertexAttribArray(0);
-				glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
-				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *) 0);
-				glDrawArrays(GL_TRIANGLES, 0, 6);
-				glDisableVertexAttribArray(0);
+			// draw quad
+			glEnableVertexAttribArray(0);
+			glBindBuffer(GL_ARRAY_BUFFER, quad_vertexbuffer);
+			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+			glDrawArrays(GL_TRIANGLES, 0, 6);
+			glDisableVertexAttribArray(0);
 
 			ambientProg->unbind();
 
@@ -677,14 +689,14 @@ public:
 			// TODO check
 			// // 7. enable face culling to only view front faces
 			glEnable(GL_CULL_FACE);
-		
+
 			for (const Light& light : lights) {
 				glEnable(GL_DEPTH_TEST);
-			    // FRONT PASS
+				// FRONT PASS
 				// 1. disable writing to the color buffer for the first pass
 				glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 				// 2. disable writing to the depth buffer for the first pass
-				// glDepthMask(GL_FALSE);
+				glDepthMask(GL_FALSE);
 				// 4. init the stencil buffer to 0
 				glClear(GL_STENCIL_BUFFER_BIT);
 				// 5. func = always, ref = 0, mask = 0xFF
@@ -710,8 +722,8 @@ public:
 
 				P = SetProjectionMatrix(frontProg);
 				V = SetView(frontProg);
-				
-				SetModel(frontProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+
+				SetModel(frontProg, light.Position, 0.0f, 0.0f, light.radius, light.radius, light.radius);
 				// 10. DRAW light volumes
 				lightVolume->draw(frontProg);
 
@@ -724,7 +736,7 @@ public:
 				// check where 0 is written to the stencil buffer
 				// (can flip stencil op if not working peroperly)
 				glStencilFunc(GL_EQUAL, 0, 0xFF);
-    
+
 				// do not have to write to the stencil, only read and chek against it
 				glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
@@ -736,16 +748,16 @@ public:
 
 				// cull FRONT faces
 				glCullFace(GL_FRONT);
-				
+
 				backProg->bind();
 				glActiveTexture(GL_TEXTURE0);
-				glBindTexture(GL_TEXTURE_2D, gPosition); 
-				glActiveTexture(GL_TEXTURE1); 
-				glBindTexture(GL_TEXTURE_2D, gNormal); 
-				glActiveTexture(GL_TEXTURE2); 
-				glBindTexture(GL_TEXTURE_2D, gColorSpec); 
-				glActiveTexture(GL_TEXTURE3); 
-				glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture); 
+				glBindTexture(GL_TEXTURE_2D, gPosition);
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_2D, gNormal);
+				glActiveTexture(GL_TEXTURE2);
+				glBindTexture(GL_TEXTURE_2D, gColorSpec);
+				glActiveTexture(GL_TEXTURE3);
+				glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
 
 				// GLint loc = backProg->getUniform("gPosition");
 				// if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
@@ -755,16 +767,16 @@ public:
 				glUniform1i(backProg->getUniform("lightMap"), 3);
 
 				glUniform3f(backProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
-				glUniform3f(backProg->getUniform("lightCol"), light.Color.r, light.Color.g, light.Color.b);
+				glUniform1f(backProg->getUniform("lightRadius"), light.radius);
 				glUniform2f(backProg->getUniform("resolution"), width, height);
 				//cout << "width: " << width << "height: " << height << endl;
 
 				P = SetProjectionMatrix(backProg);
 				V = SetView(backProg);
-				SetModel(backProg, light.Position, 0.0f, 0.0f, light_radius, light_radius, light_radius);
+				SetModel(backProg, light.Position, 0.0f, 0.0f, light.radius, light.radius, light.radius);
 				lightVolume->draw(backProg);
-				backProg->unbind(); 
-			} 
+				backProg->unbind();
+			}
 
 			// glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			// glClear(GL_COLOR_BUFFER_BIT); 
@@ -787,8 +799,8 @@ public:
 	mat4 SetProjectionMatrix(shared_ptr<Program> curShade) {
 		int width, height;
 		glfwGetFramebufferSize(windowManager->getHandle(), &width, &height);
-		float aspect = width/(float)height;
-		
+		float aspect = width / (float)height;
+
 		mat4 Projection = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
 		glUniformMatrix4fv(curShade->getUniform("P"), 1, GL_FALSE, value_ptr(Projection));
 		return Projection;
@@ -811,12 +823,12 @@ public:
 		return Cam;
 	}
 
-	void mouseCallback(GLFWwindow *window, int button, int action, int mods) {
-    	cout << "use two finger mouse scroll" << endl;
+	void mouseCallback(GLFWwindow* window, int button, int action, int mods) {
+		cout << "use two finger mouse scroll" << endl;
 
 	}
 
-	void resizeCallback(GLFWwindow *window, int width, int height)
+	void resizeCallback(GLFWwindow* window, int width, int height)
 	{
 		glViewport(0, 0, width, height);
 	}
@@ -838,7 +850,7 @@ public:
 		};
 
 		static const GLfloat left_wall_data[] =
-		{  
+		{
 			0.0f, 1.0f, -1.0f,
 			0.0f, -1.0f, 1.0f,
 			0.0f, 1.0f, 1.0f,
@@ -862,11 +874,11 @@ public:
 	void scrollCallback(GLFWwindow* window, double deltaX, double deltaY) {
 		vec3 diff, newV;
 
-		g_theta += deltaX*0.2;
-		g_phi += deltaY*0.2;
-		newV.x = cosf(g_phi)*cosf(g_theta);
-		newV.y = -1.0*sinf(g_phi);
-		newV.z = 1.0*cosf(g_phi)*cosf((3.14/2.0-g_theta));
+		g_theta += deltaX * 0.2;
+		g_phi += deltaY * 0.2;
+		newV.x = cosf(g_phi) * cosf(g_theta);
+		newV.y = -1.0 * sinf(g_phi);
+		newV.z = 1.0 * cosf(g_phi) * cosf((3.14 / 2.0 - g_theta));
 		diff.x = (g_lookAt.x - g_eye.x) - newV.x;
 		diff.y = (g_lookAt.y - g_eye.y) - newV.y;
 		diff.z = (g_lookAt.z - g_eye.z) - newV.z;
@@ -874,7 +886,7 @@ public:
 		g_lookAt.y = g_lookAt.y - diff.y;
 		g_lookAt.z = g_lookAt.z - diff.z;
 		view = g_eye - g_lookAt;
-		strafe = cross(vec3(0, 1,0), view);
+		strafe = cross(vec3(0, 1, 0), view);
 	}
 
 	void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -924,15 +936,15 @@ public:
 			strafe = cross(vec3(0, 1, 0), view);
 		}
 		if (key == GLFW_KEY_Z && action == GLFW_PRESS) {
-			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		}
 		if (key == GLFW_KEY_Z && action == GLFW_RELEASE) {
-			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 		if (key == GLFW_KEY_P && action == GLFW_PRESS) {
 			FirstTime = !FirstTime;
 		}
-		if (action == GLFW_RELEASE){
+		if (action == GLFW_RELEASE) {
 			MOVER = MOVEF = MOVEB = MOVEL = false;
 		}
 	}
@@ -942,26 +954,26 @@ public:
 	{
 		switch (i) {
 		case 0: //shiny blue plastic
-		glUniform3f(prog->getUniform("MatAmb"), 0.02f, 0.04f, 0.2f);
-		glUniform3f(prog->getUniform("MatDif"), 0.0f, 0.16f, 0.9f);
-		break;
+			glUniform3f(prog->getUniform("MatAmb"), 0.02f, 0.04f, 0.2f);
+			glUniform3f(prog->getUniform("MatDif"), 0.0f, 0.16f, 0.9f);
+			break;
 		case 1: // flat grey
-		glUniform3f(prog->getUniform("MatAmb"), 0.13f, 0.13f, 0.14f);
-		glUniform3f(prog->getUniform("MatDif"), 0.3f, 0.3f, 0.4f);
-		break;
+			glUniform3f(prog->getUniform("MatAmb"), 0.13f, 0.13f, 0.14f);
+			glUniform3f(prog->getUniform("MatDif"), 0.3f, 0.3f, 0.4f);
+			break;
 		case 2: //brass
-		glUniform3f(prog->getUniform("MatAmb"), 0.3294f, 0.2235f, 0.02745f);
-		glUniform3f(prog->getUniform("MatDif"), 0.7804f, 0.5686f, 0.11373f);
-		break;
+			glUniform3f(prog->getUniform("MatAmb"), 0.3294f, 0.2235f, 0.02745f);
+			glUniform3f(prog->getUniform("MatDif"), 0.7804f, 0.5686f, 0.11373f);
+			break;
 		case 3: //copper
-		glUniform3f(prog->getUniform("MatAmb"), 0.1913f, 0.0735f, 0.0225f);
-		glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
-		break;
+			glUniform3f(prog->getUniform("MatAmb"), 0.1913f, 0.0735f, 0.0225f);
+			glUniform3f(prog->getUniform("MatDif"), 0.7038f, 0.27048f, 0.0828f);
+			break;
 		}
 	}
 };
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
 	// Where the resources are loaded from
 	std::string resourceDir = "../resources";
@@ -971,8 +983,8 @@ int main(int argc, char *argv[])
 		resourceDir = argv[1];
 	}
 
-	Application *application = new Application();
-	
+	Application* application = new Application();
+
 	// SCALE WINDOW
 	glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
 	// glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -981,7 +993,7 @@ int main(int argc, char *argv[])
 	// Your main will always include a similar set up to establish your window
 	// and GL context, etc.
 
-	WindowManager *windowManager = new WindowManager();
+	WindowManager* windowManager = new WindowManager();
 
 	windowManager->init(960, 720);
 	windowManager->setEventCallbacks(application);
@@ -996,16 +1008,16 @@ int main(int argc, char *argv[])
 
 	auto lastTime = std::chrono::high_resolution_clock::now();
 	// Loop until the user closes the window.
-	while (! glfwWindowShouldClose(windowManager->getHandle()))
+	while (!glfwWindowShouldClose(windowManager->getHandle()))
 	{
 		// save current time for next frame
 		auto nextLastTime = chrono::high_resolution_clock::now();
 
 		// get time since last frame
 		float deltaTime =
-		chrono::duration_cast<std::chrono::microseconds>(
-			chrono::high_resolution_clock::now() - lastTime)
-		.count();
+			chrono::duration_cast<std::chrono::microseconds>(
+				chrono::high_resolution_clock::now() - lastTime)
+			.count();
 		// convert microseconds (weird) to seconds (less weird)
 		deltaTime *= 0.000001;
 
