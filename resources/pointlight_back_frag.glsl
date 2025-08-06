@@ -1,7 +1,7 @@
 #version 330 core
 out vec4 FragColor;
 in vec2 texCoord;
-//in vec3 lightFragPos;
+in vec3 lightFragPos;
 //in vec3 lightFragNor;
 
 uniform sampler2D gPosition;
@@ -41,7 +41,7 @@ void main() {
 
 
    // lightpos is in VIEW SPACE 
-    float d = distance(lightPos, FragPos);
+    float d = distance(lightPos, lightFragPos);
     float lightDirUP = dot(vec3(0.0, 1.0, 0.0), normal) * 0.01;
     // TODO added
     //      float dC = max(0, dot(normalize(lightV), normalize(Normal)));
@@ -50,19 +50,47 @@ void main() {
     vec3 diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo; //* lightCol * Albedo;
     // vec3 diffuse;
 
-    if(d != 0){
-       // diffuse = vec3(1.0f, 0.0f, 0.0f);
-       // diffuse = max(dot(normalize(lightDir), normalize(normal)), 0.0) * Albedo * (d/float(lightRadius));
-        diffuse = diffuse * (1/(float(d*d) + d));
-     }
+    if (d <= lightRadius){
+       // diffuse =  diffuse * (1.0f/float(1.0f + ((d*d))));
+        float normalizedDistance = d / lightRadius;
+        float attenuation =  min(0.0f, 1.0f - float(normalizedDistance));
+        
+       // float t = d / lightRadius; 
+       // float edgeFalloff = mix(1.0f, 0.0f, t); // tried mix, not SMOOTH
+        //float edgeFalloff = 1.0 - smoothstep(0.0f, lightRadius, d);
+        diffuse *= attenuation;
+       // diffuse = diffuse * attenuation * edgeFalloff;
+       
+    }
+   
+
+   //if (d != 0 && abs(d) <= lightRadius){
+     // d /= lightRadius; //normalize for radius 
+       //diffuse = diffuse * (1.0/(float(d*d)*5));
+  // }
+   //else if (d <= lightRadius){
+       // d /= lightRadius;
+    //  diffuse = diffuse * (1.0/float(d*d));
+ //  }
+
+  // float alpha = 1.0;
+
+    //if (d != 0 && d <= lightRadius){
+       // d /= lightRadius; //normalize for radius 
+      //  diffuse = diffuse * (1.0/(float(d*d)));
+       // alpha = 1/float(d) * 0.3; 
+   
+    //}
+
+     // discard maybe??
 
     // no longer using light normals to calculate light direction
-    // if (d > lightRadius){ 
+    //if (d > lightRadius){ 
     //     // discard;
-    //     // diffuse = diffuse/(float(d*d)-0.2);
+        // diffuse = diffuse/(float(d*d)-0.2);
     //     // diffuse = vec3(1.0f, 0.5f, 0.5f);
     // //     //diffuse = diffuse/
-    // }
+   // }
     // float d = length(lightDir);
     lighting += diffuse; //+ (lightDirUP * Albedo);
     // visualize distance (larger than light volume radius)

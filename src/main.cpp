@@ -509,7 +509,7 @@ public:
 		for (int i = 1; i < rows - 1; i++) { // (1 -> rows/cols - 1 to accomodate 3x3 kernel)
 			for (int j = 1; j < cols - 1; j++) {
 				// extract the 3x3 pixel neighborhood of the current point
-				if (lights.size() > 5000) { return; }
+				if (lights.size() > 7000) { return; }
 
 				// gx = sobelX * neighborhood  (point by point mult then sum to get g)
 				// gy = sobelY * neighborhood
@@ -608,7 +608,7 @@ public:
 
 		// populates light array
 		lights.clear();
-		//computeEdges();
+		computeEdges();
 
 		// lights behind couch
 		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {

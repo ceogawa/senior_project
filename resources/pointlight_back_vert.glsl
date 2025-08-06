@@ -6,7 +6,7 @@ uniform mat4 V;
 uniform mat4 M;
 
 //out vec3 lightFragNor;
-//out vec3 lightFragPos;
+out vec3 lightFragPos;
 out vec2 texCoord;
 
 void main()
@@ -16,6 +16,6 @@ void main()
 	texCoord = (vertPos.xy+vec2(1, 1))/2.0;
 	gl_Position = P * V * M * vertPos;
 	//lightFragNor = (V* M * vec4(vertNor, 0.0)).xyz;
-	//lightFragPos = vec3(V* M * vertPos);
+	lightFragPos = vec3(V* M * vertPos);
 }
 
