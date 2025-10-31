@@ -291,26 +291,27 @@ public:
 
 	}
 
+	// retrieves random float
 	float niceRandom() {
 		return -1.0 + 2.0 * (float(rand()) / float(RAND_MAX));
 	}
 
+	// adds default lights to scene, if initbuffers calls it
 	void initLights() {
+	 	// ambient ceiling lights
+		lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
+		lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
 
-		//// TODO WIP light placement
-	 //   // ambient ceiling lights
-		//lights.push_back({vec3(0.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		//lights.push_back({vec3(-2.0f, 2.0f, -1.0f), vec3(1.0f, 0.9f, 0.8f)});
-		//lights.push_back({vec3(2.0f, 2.0f, -1.0f), glm::vec3(1.0f, 0.9f, 0.8f)});
+		// random lights for deferred pass
+		for (int i = 0; i < 500; i++){
+			lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
+		}
 
-		///*for (int i = 0; i < 500; i++){
-		//	lights.push_back({vec3(niceRandom()*10 - 5, niceRandom(), niceRandom()*3 - 1), vec3(1.0f, 1.0f, 1.0f)});
-		//}*/
-
-		//// lights behind couch
-		//for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
-		//	lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
-		//}
+		// lights behind couch
+		for (float x = -1.5f; x <= 1.5f; x += 0.75f) {
+			lights.push_back({glm::vec3(x, 0.8f, -2.0f), glm::vec3(0.3f, 0.7f, 1.0f)}); // Cool blue
+		}
 	}
 
 
@@ -342,9 +343,10 @@ public:
 	void initGeom(const std::string& resourceDirectory)
 	{
 
-		//Initialize the geometry to render a quad to the screen
+		// initialize the geometry to render a quad to the screen
 		initQuad();
 
+		// initialize geometry using tinyobj loader
 		sofa = initMultiMesh("/objs/sofa.obj", sofa);
 		bookshelf = initMultiMesh("/objs/bookcase.obj", bookshelf);
 		coffeetable = initMultiMesh("/objs/table2.obj", coffeetable);
@@ -384,12 +386,8 @@ public:
 		mat4 P = SetProjectionMatrix(prog);
 		mat4 V = SetView(prog);
 
-		// set model sets up Model matrix
-
 		// SOFA
 		for (int i = 0; i < sofa.size(); i++) {
-			/*mat4 scaleUnit = scale(mat4(1.0f), vec3(1.0 / (sofa[i]->max.x - sofa[i]->min.x)));
-			mat4 trans = translate(glm::mat4(1.0f), vec3(i, 0.5f, -1.0f));*/
 			SetModel(prog, vec3(0, 0.3f, -1.0f), 0.0f, 0.0f, 1.0f, 1.0f, 1.0f);
 			SetMaterial(0);
 			sofa[i]->draw(prog);
@@ -410,31 +408,25 @@ public:
 		}
 
 		//left wall
-		SetModel(prog, vec3(-4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
 		SetMaterial(1);
+		SetModel(prog, vec3(-4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
 		wall->draw(prog);
 
 		//right wall
 		SetModel(prog, vec3(4.0f, 0.0f, 0.0f), 0.0f, 0.0f, 0.9f, 0.55f, 0.9f);
-		SetMaterial(1);
 		wall->draw(prog);
 
 		//back wall
 		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 0.0f, 1.5f, 0.55f, 0.9f);
-		SetMaterial(1);
 		wall->draw(prog);
 
 		// floor
 		SetModel(prog, vec3(0.0f, 0.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
-		SetMaterial(1);
 		wall->draw(prog);
 
 		// ceiling
 		SetModel(prog, vec3(0.0f, 4.0f, -4.0f), 1.57f, 1.57f, 1.5f, 1.2f, 0.9f);
-		SetMaterial(1);
 		wall->draw(prog);
-
-		//SetModel(prog, )
 
 
 		// unbind after geometry pass
@@ -499,16 +491,14 @@ public:
 						gy += sobelY[k][l] * pixels[pixelIndex];
 					}
 				}
-				// gMag = sqrt(gx^2 + gy^2)
+
 				float gMag = sqrt((gx * gx) + (gy * gy));
 
 				// 1. if there is a significant change in intensity value, 
 				// 		retrieve depth by "reversing" the linearization shader logic
 				// 2. add light to lights with new position		
 				if (gMag > magnitudeThreshold) {
-					//cout << "magnitude of gradient: " << gMag << endl;
 					projMat = perspective(radians(50.0f), aspect, NEAR_PLANE, FAR_PLANE);
-					// mat4 modelMat = glm::scale(glm::mat4(1.0f), vec3(light_radius, light_radius, light_radius));
 					modelMat = mat4(1.0f);
 					viewMat = lookAt(g_eye, g_lookAt, vec3(0, 1, 0));
 
@@ -517,11 +507,6 @@ public:
 					// retrieve pixel intensity at position (screen space)
 					float storedDepth = pixels[(i * width + j) * 4];
 					float linearDepth = 1.0f - storedDepth;
-
-					// this is ndc -> screen space: 0.5f * (normalize(fragNor) + vec3(1.0)); 
-					// now, screenspace -> ndc:  takes 0->width to -1->1
-					//float ndcX = (2.0f * j) / width - 1.0f; // j = col
-					//float ndcY = (2.0f * flipped_y) / (float)(height - 1.0f); 
 
 					// convert back to viewspace because fragpos in the geom shader is in viewspace
 					// (undo shader linearization to retrieve depth)
@@ -573,7 +558,6 @@ public:
 		// GEOMETRY PASS (sets up gbuffer for scene)
 		drawGeometry();
 
-		// PREVIOUSLY AND BASE CODE
 		// bind the framebuffer to the lightAccumulation frame buffer, so that each light's computations are additively blended
 		glBindFramebuffer(GL_FRAMEBUFFER, lightAccumulationBuf);
 		// clear the color buffer before all light computations
@@ -593,17 +577,12 @@ public:
 
 		// simplifies because we are only writing the normal data of the lights to the framebuffer
 		for (const Light& light : lights) {
-			//glUniform3f(volumesNoCullingProg->getUniform("lightPos"), light.Position.x, light.Position.y, light.Position.z);
-			//glUniform1f(norProg->getUniform("lightRadius"), light.radius);
 			SetModel(norProg, light.Position, 0.0f, 0.0f, light.radius, light.radius, light.radius);
 			lightVolume->draw(norProg);
 		}
 		norProg->unbind();
 
-		//glCullFace(GL_BACK);  // Restore normal culling
-		//glDepthFunc(GL_LESS); // Restore default depth testing
-
-		//code to write out the FBO (texture) just once -an example
+		// code to write out the FBO (texture) just once -an example
 		if (FirstTime) {
 			assert(GLTextureWriter::WriteImage(gBuffer, "gBuf.png"));
 			assert(GLTextureWriter::WriteImage(gPosition, "gPos.png"));
@@ -627,7 +606,6 @@ public:
 			);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
 			glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // clear everytime you bind to new framebuffer
 
 			// 1. enable blending
@@ -656,15 +634,15 @@ public:
 
 			ambientProg->unbind();
 
-			//// populates light array
+			// populates light array
 			//lights.clear();
-			//computeEdges();
+			//***COMPUTES THE EDGES AND POPULATES THE LIGHT ARRAY FOR RIMLIGHTING****************
+			//computeEdges(); 
 
 			// 3. enable stencil testing 
 			// conditionally eliminates pixels based on comparison test
 			glEnable(GL_STENCIL_TEST);
-			// TODO check
-			// // 7. enable face culling to only view front faces
+			// 7. enable face culling to only view front faces
 			glEnable(GL_CULL_FACE);
 
 			for (const Light& light : lights) {
@@ -680,7 +658,6 @@ public:
 				// we set this to always because we want every fragment 
 				// to pass the stencil test so we can check the DEPTH
 				glStencilFunc(GL_ALWAYS, 0, 0xFF);
-				// TODO this test is GL_LEQUAL according to diagram
 				//https://cglearn.eu/pub/advanced-computer-graphics/deferred-rendering
 				glDepthFunc(GL_LEQUAL); // TODO check this depth test 
 				// 6. configure the stencil operations to keep frag
@@ -737,8 +714,6 @@ public:
 				glBindTexture(GL_TEXTURE_2D, gColorSpec);
 				glActiveTexture(GL_TEXTURE3);
 				glBindTexture(GL_TEXTURE_2D, lightAccumulationTexture);
-		/*		glActiveTexture(GL_TEXTURE4);
-				glBindTexture(GL_TEXTURE_2D, gDepth);*/
 
 				// GLint loc = backProg->getUniform("gPosition");
 				// if (loc == -1) { std::cerr << "gPosition uniform not found!" << std::endl; }
@@ -746,18 +721,15 @@ public:
 				glUniform1i(backProg->getUniform("gNormal"), 1);
 				glUniform1i(backProg->getUniform("gColorSpec"), 2);
 				glUniform1i(backProg->getUniform("lightMap"), 3);
-				//glUniform1i(backProg->getUniform("gDepth"), 4);/
 
 				V = SetView(backProg);
 
 				vec4 lightViewPos = V * vec4(light.Position, 1.0);//
 
-				//glUniform3f(backProg->getUniform("lightPos"), lightViewPos.x, lightViewPos.y, lightViewPos.z);
 				glUniform3f(backProg->getUniform("lightPos"), lightViewPos.x, lightViewPos.y, lightViewPos.z);
 
 				glUniform1f(backProg->getUniform("lightRadius"), light.radius);
 				glUniform2f(backProg->getUniform("resolution"), width, height);
-				//cout << "width: " << width << "height: " << height << endl;
 
 				P = SetProjectionMatrix(backProg);
 
@@ -765,9 +737,6 @@ public:
 				lightVolume->draw(backProg);
 				backProg->unbind();
 			}
-
-			// glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			// glClear(GL_COLOR_BUFFER_BIT); 
 
 			// RESTORE ALLLL previous opengl settings
 			glDisable(GL_BLEND);
@@ -813,7 +782,6 @@ public:
 
 	void mouseCallback(GLFWwindow* window, int button, int action, int mods) {
 		cout << "use two finger mouse scroll" << endl;
-
 	}
 
 	void resizeCallback(GLFWwindow* window, int width, int height)
@@ -978,17 +946,11 @@ int main(int argc, char* argv[])
 	// glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
 
-	// Your main will always include a similar set up to establish your window
-	// and GL context, etc.
-
 	WindowManager* windowManager = new WindowManager();
 
 	windowManager->init(960, 720);
 	windowManager->setEventCallbacks(application);
 	application->windowManager = windowManager;
-
-	// This is the code that will likely change program to program as you
-	// may need to initialize or set up different data and state
 
 	// setup shaders, setup gbuffer, create and attach depth buffer
 	application->initGL(resourceDir);
