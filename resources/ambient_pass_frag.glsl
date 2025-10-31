@@ -19,6 +19,5 @@ void main() {
     vec3 lighting = diffuse * intensity;
     FragColor = vec4(lighting, 1.0);
     
-    // FragColor = vec4(1.0, 0.1, 0.1, 1.0);
 
 } 

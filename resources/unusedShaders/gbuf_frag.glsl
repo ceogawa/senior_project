@@ -13,7 +13,6 @@ struct Light{
 
 const int NR_LIGHTS = 32;
 uniform vec3 lightPos[NR_LIGHTS];
-//uniform Light lights[NR_LIGHTS];
 uniform vec3 viewPos;
 
 

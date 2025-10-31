@@ -142,12 +142,7 @@ public:
 		// attributes for geom pass
 		prog->addAttribute("vertPos");
 		prog->addAttribute("vertNor");
-		// vert shader passes
-		//		vec3 fragPos;
-		//		vec3 fragNor; 
-		// to the geometry frag shader
 
-		// TODO texprog? modify to pass color to defer
 		texProg = make_shared<Program>();
 		texProg->setVerbose(true);
 		texProg->setShaderNames(
@@ -156,7 +151,6 @@ public:
 		texProg->init();
 		texProg->addUniform("texBuf");
 		texProg->addAttribute("vertPos");
-		//texProg->addUniform("Ldir");
 
 		frontProg = make_shared<Program>();
 		frontProg->setVerbose(true);
@@ -204,24 +198,6 @@ public:
 		ambientProg->addUniform("gColorSpec");
 		ambientProg->addUniform("gNormal");
 		ambientProg->addUniform("lightDir");
-
-		// Light Volumes Deferred Render Pass, No Stencil Culling
-		volumesNoCullingProg = make_shared<Program>();
-		volumesNoCullingProg->setVerbose(true);
-		volumesNoCullingProg->setShaderNames(
-			resourceDirectory + "/screen_vert.glsl",
-			resourceDirectory + "/lightvolume_no_culling_frag.glsl"
-		);
-		volumesNoCullingProg->init();
-		// add gbuffer uniforms to frag shader
-		volumesNoCullingProg->addUniform("gPosition");
-		volumesNoCullingProg->addUniform("gNormal");
-		volumesNoCullingProg->addUniform("gColorSpec");
-		volumesNoCullingProg->addUniform("lightBuf");
-		//volumesNoCullingProg->addUniform("lightPos");
-		//volumesNoCullingProg->addUniform("lightCol");
-		volumesNoCullingProg->addAttribute("vertPos");
-		//volumesNoCullingProg->addAttribute("vertNor");
 
 		// Initialize the GLSL program.
 		norProg = make_shared<Program>();
